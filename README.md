@@ -10,14 +10,25 @@
 
 Every B2B, kiosk, hospitality, or fleet application eventually hits the customisation wall:
 - **CSS variables and config flags aren't enough** when a customer wants to reorder a screen, combine two steps, or route a category button to a custom calendar view.
+- **Static templates (Liquid, Mustache, JSON schemas) trap behaviour in the app**—they can arrange markup, but every new interaction requires a new hook from your core team, and customising a page means copying the whole template and losing upstream updates.
 - **Forking per customer doesn't scale**—every new feature or security fix becomes an $N$-way merge across customer branches.
 - **Traditional plugin APIs are fragile and unsafe**, exposing internal React trees or allowing broken third-party code to white-screen a production terminal.
 
 **Livrea takes a different approach: object-oriented page inheritance across a zero-trust sandbox boundary.**
 
-1. **Extend, don't rewrite:** Your app ships base classes for its pages (`HomePage`, `MenuPage`, `CheckoutPage`). An empty subclass *is* your default page. A customer theme overrides only the specific **slots** and **events** it wants to change, and wraps or falls back to your original UI with `<this.Header.Base />`.
+| Capability | Static Templates (Liquid / JSON) | Livrea Page Classes |
+|---|---|---|
+| **Layout** | Full markup replacement | Overridable **slots** (`<this.Header />`) or full `render()` |
+| **Default look & updates** | Copy and edit the whole template | **Inherited:** an empty subclass *is* the app's page; override only what changes |
+| **Behaviour** | Fixed in the app (`data-action` only) | In the theme: `listeners`, typed events, and replaceable `static defaults` |
+| **Authoring experience** | Syntax checks only | Full TypeScript autocomplete for slots, store paths, event payloads, and props |
+| **Safety** | No code execution | Sandboxed execution (`remote-dom` pattern) with automatic slot & page fallbacks |
+
+### Key Pillars
+
+1. **Three-level inheritance:** *App Base Classes → Parent Theme → Child Theme.* Your app ships base classes for its pages (`HomePage`, `MenuPage`, `CheckoutPage`). A parent theme defines a brand or layout family; a customer's child theme overrides only a couple of slots or files and automatically inherits updates to the rest.
 2. **Fine-grained reactivity by default:** Theme data comes from a read-only store via path-tracked selectors (`select()`), and behaviour from Ext JS-style listeners (`on()`) and a typed event catalog. Only the exact unit (layout, page, slot, or component) that read a changed path re-renders and crosses the wire.
-3. **Built for untrusted code:** Themes never touch the DOM or your app's internals. They emit a serialisable tree of elements and host component placeholders. The host sanitises every tag, attribute, URL, style, and prop, times out stalled event handlers in 100 ms, prevents infinite redirect loops, and automatically falls back to your base slot—or fallback page—if theme code throws.
+3. **Built for untrusted code—or fast first-party themes:** Themes never touch the DOM or your app's internals. They emit a serialisable tree of elements and opaque host component placeholders (`remote-dom` style). Run them inside a Worker + Hardened JS (SES) sandbox for third-party authors, or in the main thread (`connectInThread`) for first-party themes with zero code changes.
 4. **Zero dependencies:** One lightweight package (`livrea`, `livrea/runtime`, `livrea/host`, `livrea/react`), with React as an optional peer dependency.
 
 ---
@@ -104,8 +115,8 @@ export const { ThemeProvider, useTheme } = createThemeApp({
 
 ## Documentation
 
-- **[Writing Themes (`docs/themes.md`)](docs/themes.md)** — Slots, `.Base` fallbacks, function children, `select()` path tracking, `on()` listeners, `static defaults`, class inheritance rules, and styling.
-- **[App Integration (`docs/apps.md`)](docs/apps.md)** — Type augmentation (`ThemeStore`, `EventCatalog`), base page classes, `hostComponent()`, the runtime/host protocol, `HostPolicy` sanitisation, and React integration.
+- **[Writing Themes (`docs/themes.md`)](docs/themes.md)** — React hooks to class members, slots, `.Base` fallbacks, function children, `select()` path tracking & chaining, `on()` listeners, the two event families, `static defaults`, and class inheritance.
+- **[App Integration & Security (`docs/apps.md`)](docs/apps.md)** — Type augmentation (`ThemeStore`, `EventCatalog`), base page classes, opaque `hostComponent()`s for privacy, narrowing vs. widening capabilities, headless testing in Node, and the `.livrea` package format.
 
 ---
 
@@ -129,10 +140,9 @@ Livrea ships as a single zero-dependency package with tree-shakeable subpath exp
 
 ### Upcoming Milestones
 
-- **Sandbox loader:** A Web Worker with a Hardened JavaScript (SES) compartment that evaluates compiled theme modules in strict isolation.
-- **The `pack` tool (`@livrea/cli`):** Checks, compiles, and bundles a theme into a verifiable package.
-- **CSS scoping per class:** Automatic per-class selector scoping so theme styles never bleed across components.
-- **Clock events:** Built-in declarative time triggers (`every:15m`, `at:07:00`) for kiosks and digital signage (e.g. switching from breakfast to lunch menus automatically).
+- **Sandbox loader:** A Web Worker with a Hardened JavaScript (SES) compartment (with QuickJS-in-WebAssembly as a fallback option) that evaluates compiled theme modules in strict isolation.
+- **The `pack` tool (`@livrea/cli`):** Type-checks, compiles, and bundles a theme folder into a single verifiable `.livrea` archive (`theme.json`, `source/`, compiled `build/`, and SHA-256 `manifest.json`) so production servers never need to compile TSX on the fly.
+- **CSS scoping per class:** Automatic per-class selector scoping so a page's styles never bleed into other pages.
 
 ### Monorepo & Workspace Strategy
 
