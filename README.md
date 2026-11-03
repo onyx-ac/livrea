@@ -147,7 +147,7 @@ At that point, the repository will split into `packages/livrea` and `packages/cl
 ### npm Organisation & First Release
 
 - **npm organisation (`@livrea`):** Publishing `livrea` itself does not require an organisation, as unscoped packages are free. However, creating the `@livrea` organisation on npm before the first public release is recommended: it is free for public packages and reserves the `@livrea/*` scope for `@livrea/cli` and future tooling so nobody else can claim it.
-- **Licence & publishing:** The first public release waits only on choosing the licence. Until `livrea` is published, the unscoped package name remains available but unreserved on the registry, so publishing an initial `0.1.0` once the licence is set will lock in the name.
+- **Publishing:** With the licence set to **CC BY-SA 4.0**, `livrea` is ready for its initial `0.1.0` publication once `"private": true` is removed from `package.json`, locking in the unscoped package name on the npm registry.
 
 ---
 
@@ -159,3 +159,9 @@ npm test
 npm run typecheck
 npm run build        # dist/
 ```
+
+---
+
+## Licence
+
+Licensed under [Creative Commons Attribution-ShareAlike 4.0 International (CC BY-SA 4.0)](LICENSE).

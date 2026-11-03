@@ -2,6 +2,7 @@
   "name": "livrea",
   "version": "0.1.0",
   "description": "Livrea: themes for React apps, written as classes. Pages with overridable slots, tracked selectors, listeners and a typed event catalog, rendered from a sandbox.",
+  "license": "CC-BY-SA-4.0",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/onyx-ac/livrea.git"
@@ -37,6 +38,7 @@
   },
   "files": [
     "dist",
+    "LICENSE",
     "README.md"
   ],
   "scripts": {
