@@ -89,14 +89,18 @@ describe('rendering a theme in React', () => {
     expect(app.client.tree.unit(app.client.tree.root!)).toEqual([]);
   });
 
-  it('shows the fallback when the page fails', () => {
+  it('shows the fallback when the page fails, and recovers when switching to a working page', () => {
     class Broken extends Component {
       render(): never {
         throw new Error('broken');
       }
     }
-    const app = mount({ broken: Broken }, createElement(ThemePage, { page: 'broken', fallback: createElement('p', null, 'the old view') }));
+    const fallback = createElement('p', null, 'the old view');
+    const app = mount({ broken: Broken, home: HomePage }, createElement(ThemePage, { page: 'broken', fallback }));
     expect(app.container.innerHTML).toBe('<p>the old view</p>');
+
+    act(() => app.root.render(createElement(ThemeClientProvider, { client: app.client, components }, createElement(ThemePage, { page: 'home', fallback }))));
+    expect(app.container.querySelector('h1')!.textContent).toBe('Grand');
   });
 
   it('adds the theme’s styles', () => {
@@ -188,5 +192,24 @@ describe('createThemeApp', () => {
     render();
     await act(async () => void handle.emit('session:start', {}));
     expect(app.navigations).toEqual([{ page: 'welcome' }]);
+  });
+
+  it('closes the theme connection when ThemeProvider unmounts', () => {
+    const container = document.createElement('div');
+    document.body.append(container);
+    const root = createRoot(container);
+    act(() =>
+      root.render(
+        createElement(AppState, null, createElement(kiosk.ThemeProvider, null, createElement(ThemePage, { page: 'home' }), createElement(Probe)))
+      )
+    );
+    let closed = false;
+    const originalClose = handle.client.close.bind(handle.client);
+    handle.client.close = () => {
+      closed = true;
+      originalClose();
+    };
+    act(() => root.unmount());
+    expect(closed).toBe(true);
   });
 });

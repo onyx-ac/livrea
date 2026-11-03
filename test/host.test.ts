@@ -59,8 +59,51 @@ describe('checking what a theme sends', () => {
       POLICY,
       (p) => problems.push(p)
     );
-    expect(css).toBe("\n.a { background: url('/media/ok.png'); }\n.b { background: none; width: alert(1)); }");
+    expect(css).toBe("\n.a { background: url('/media/ok.png'); }\n.b { background: none; width: ; }");
     expect(problems).toHaveLength(3);
+  });
+
+  it('catches CSS escapes, comments, stitched keywords, mismatched quotes and unclosed url()', () => {
+    const problems: string[] = [];
+    const css = sanitizeCss(
+      [
+        '\\40 import url(/media/x.css);',
+        '@im@import;port url(/media/y.css);',
+        '.a { background: \\75\\72\\6c(https://evil.example/escaped.png); }',
+        '.b { background: u/*comment*/rl("https://evil.example/mismatched\'); }',
+        '.c { width: expr/**/ession(alert(1)); }',
+        '.d { background: url(https://evil.example/unclosed'
+      ].join('\n'),
+      POLICY,
+      (p) => problems.push(p)
+    );
+    expect(css).toBe('\n\n.a { background: none; }\n.b { background: none; }\n.c { width: ; }\n.d { background: none');
+    expect(problems).toEqual([
+      'An @import was removed from the styles.',
+      'An @import was removed from the styles.',
+      'A script-like value was removed from the styles.',
+      'An @import was removed from the styles.',
+      'The address https://evil.example/escaped.png was removed from the styles.',
+      'The address "https://evil.example/mismatched\' was removed from the styles.',
+      'The address https://evil.example/unclosed was removed from the styles.'
+    ]);
+
+    const { tree } = clean([
+      {
+        t: 'e',
+        tag: 'div',
+        props: {
+          style: {
+            background: '\\75rl(https://evil.example/x)',
+            backgroundImage: 'url(https://evil.example/unclosed',
+            width: 'expr/*x*/ession(1)',
+            color: 'green'
+          }
+        },
+        c: []
+      }
+    ]);
+    expect(tree).toEqual([{ t: 'e', tag: 'div', props: { style: { color: 'green' } }, c: [] }]);
   });
 
   it('keeps keys that are short text or numbers', () => {

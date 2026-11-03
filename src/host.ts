@@ -31,7 +31,11 @@ export const SAFE_TAGS: ReadonlySet<string> = new Set([
 const ELEMENT_PROPS = new Set(['className', 'style', 'id', 'role', 'title', 'alt', 'src', 'lang', 'dir']);
 const ARIA = /^aria-[a-z]+(?:-[a-z]+)*$/;
 const CSS_PROPERTY = /^-{0,2}[a-zA-Z][a-zA-Z0-9-]*$/;
-const CSS_URL = /url\(\s*(['"]?)(.*?)\1\s*\)/gi;
+const CSS_COMMENTS = /\/\*[\s\S]*?(?:\*\/|$)/g;
+const CSS_ESCAPE = /\\(?:([0-9a-fA-F]{1,6})\s?|([^\r\n]))/g;
+const CSS_URL = /url\s*\(([^)]*)(\)|$)/gi;
+const CSS_IMPORT = /@import[^;{}]*;?/gi;
+const CSS_SCRIPT = /(?:expression\s*\(|javascript:|behavior\s*:|-moz-binding)[^;{}]*/gi;
 const CSS_FORBIDDEN = /expression\s*\(|javascript:|@import|behavior\s*:|-moz-binding/i;
 const MAX_DEPTH = 64;
 
@@ -159,27 +163,56 @@ function sanitizeStyle(value: unknown, policy: HostPolicy, problem: Problem): Re
 }
 
 function cssValueAllowed(value: string, policy: HostPolicy): boolean {
-  if (CSS_FORBIDDEN.test(value)) return false;
-  for (const match of value.matchAll(CSS_URL)) if (!policy.url(match[2] ?? '', 'css')) return false;
+  const normalized = normalizeCss(value);
+  if (CSS_FORBIDDEN.test(normalized)) return false;
+  for (const match of normalized.matchAll(CSS_URL)) {
+    const address = match[2] === ')' ? parseCssUrl(match[1] ?? '') : null;
+    if (address === null || !policy.url(address, 'css')) return false;
+  }
   return true;
 }
 
-/** A theme's CSS, without imports, script-like values or addresses the policy refuses. */
+/** A theme's CSS, without comments, escapes that hide keywords, imports, script-like values or addresses the policy refuses. */
 export function sanitizeCss(css: string, policy: HostPolicy, problem: Problem): string {
-  return css
-    .replace(/@import[^;]*;?/gi, () => {
-      problem('An @import was removed from the styles.');
-      return '';
-    })
-    .replace(CSS_URL, (whole, _quote: string, address: string) => {
-      if (policy.url(address, 'css')) return whole;
-      problem(`The address ${address} was removed from the styles.`);
-      return 'none';
-    })
-    .replace(/expression\s*\(|javascript:|behavior\s*:|-moz-binding/gi, () => {
-      problem('A script-like value was removed from the styles.');
-      return '';
-    });
+  let clean = normalizeCss(css);
+  // Loop until neither pattern matches, so stripping one part can't stitch another together.
+  for (;;) {
+    const previous = clean;
+    clean = clean
+      .replace(CSS_IMPORT, () => {
+        problem('An @import was removed from the styles.');
+        return '';
+      })
+      .replace(CSS_SCRIPT, () => {
+        problem('A script-like value was removed from the styles.');
+        return '';
+      });
+    if (clean === previous) break;
+  }
+  return clean.replace(CSS_URL, (whole, raw: string, close: string) => {
+    const address = close === ')' ? parseCssUrl(raw) : null;
+    if (address !== null && policy.url(address, 'css')) return whole;
+    problem(`The address ${address ?? raw.trim()} was removed from the styles.`);
+    return 'none';
+  });
+}
+
+/** Strips CSS comments and decodes backslash escapes so obfuscated keywords and URLs are checked as the browser sees them. */
+function normalizeCss(css: string): string {
+  return css.replace(CSS_COMMENTS, '').replace(CSS_ESCAPE, (_, hex: string | undefined, literal: string | undefined) => {
+    if (literal !== undefined) return literal;
+    const code = Number.parseInt(hex!, 16);
+    return code === 0 || code > 0x10ffff || (code >= 0xd800 && code <= 0xdfff) ? '\ufffd' : String.fromCodePoint(code);
+  });
+}
+
+function parseCssUrl(raw: string): string | null {
+  const trimmed = raw.trim();
+  if ((trimmed.startsWith("'") && trimmed.endsWith("'")) || (trimmed.startsWith('"') && trimmed.endsWith('"'))) {
+    const inner = trimmed.slice(1, -1).trim();
+    return /['"\s()]/.test(inner) ? null : inner;
+  }
+  return /['"\s()]/.test(trimmed) ? null : trimmed;
 }
 
 /** An app component's props: plain data, and function references the app calls back. */
@@ -362,6 +395,7 @@ export class ThemeClient {
   }
 
   close(): void {
+    for (const answer of this.#answers.values()) answer.settle(false);
     this.#connection.close?.();
   }
 

@@ -83,6 +83,16 @@ describe('the theme client', () => {
     expect(theme.tree.unit('u1')).toEqual([]);
     expect(errors).toEqual(["tree: The element <script> isn't allowed.", 'slot Header: broken']);
   });
+
+  it('settles pending cancellable events and closes the connection when closed', async () => {
+    const close = vi.fn();
+    const silent: Connect = () => ({ send: () => {}, close });
+    const { client: theme } = client({}, { connect: silent, answerTimeoutMs: 10_000 });
+    const pending = theme.emit('before:navigate', { to: 'spa' });
+    theme.close();
+    await expect(pending).resolves.toBe(false);
+    expect(close).toHaveBeenCalledTimes(1);
+  });
 });
 
 function* collectHosts(theme: ThemeClient, id = theme.tree.root): Generator<{ name: string; props: Record<string, unknown> }> {

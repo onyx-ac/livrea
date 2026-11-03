@@ -140,6 +140,8 @@ export function createThemeApp<App>(config: ThemeAppConfig<App>): ThemeApp {
       handle.client.setState(state);
     });
 
+    useEffect(() => () => handle.client.close(), [handle]);
+
     const before = useRef(app);
     useEffect(() => {
       const previous = before.current;
@@ -217,7 +219,11 @@ export function ThemePage({ page, params, fallback = null }: { page: string; par
   const latestParams = useRef(params);
   latestParams.current = params;
 
+  const shownKey = useRef(key);
+
   useLayoutEffect(() => {
+    setFailed(false);
+    shownKey.current = key;
     const stop = client.onError((error) => {
       if (error.where === 'page') setFailed(true);
     });
@@ -229,10 +235,10 @@ export function ThemePage({ page, params, fallback = null }: { page: string; par
   }, [client, page]);
 
   // The same page with new parameters: it updates in place, without leaving.
-  const shownKey = useRef(key);
   useLayoutEffect(() => {
     if (shownKey.current === key) return;
     shownKey.current = key;
+    setFailed(false);
     client.showPage(page, latestParams.current);
   }, [client, page, key]);
 
