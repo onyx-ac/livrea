@@ -29,7 +29,7 @@ import type { Cleanup, EventName, ThemeStore } from './types.js';
 
 export type { EventInfo } from './events.js';
 export type { AppMessage, Out, OutProps, ThemeMessage, TreeOp } from './protocol.js';
-export { Store, type Patch, type PathKey } from './store.js';
+export { applyPatches, diffState, Store, type Patch, type PathKey } from './store.js';
 
 export type ComponentClass = new () => Component<any>;
 
@@ -46,6 +46,20 @@ export interface RuntimeOptions {
   state?: object;
   /** Functions next to the state, such as `s.items(type)`. */
   helpers?: (view: any) => Record<string, unknown>;
+  /** A page to show from the first render: a restarted theme comes back whole, in one message. */
+  page?: PageShown | null;
+}
+
+/** A theme: its pages, by the names the app shows them by, and the frame around them. */
+export interface ThemeSource {
+  readonly pages: Readonly<Record<string, ComponentClass>>;
+  readonly layout?: ComponentClass;
+}
+
+/** The page on screen, with its parameters. */
+export interface PageShown {
+  readonly name: string;
+  readonly params?: Readonly<Record<string, unknown>>;
 }
 
 export interface Runtime {
@@ -572,6 +586,7 @@ export function createRuntime(options: RuntimeOptions): Runtime {
     } else {
       startOutlet(root);
     }
+    if (options.page) showPage(options.page.name, options.page.params);
   });
 
   return {

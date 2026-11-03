@@ -21,33 +21,24 @@ import {
   type ComponentType,
   type ReactNode
 } from 'react';
-import { structuralEqual } from './equality.js';
-import { SAFE_TAGS, ThemeClient, type Connect, type EventInfo, type Out, type OutProps, type ThemeError } from './host.js';
-import { createRuntime, type ComponentClass } from './runtime.js';
+import { SAFE_TAGS, ThemeClient, type Connect, type EventInfo, type Out, type OutProps, type RuntimeSetup, type ThemeError } from './host.js';
+import { createRuntime, diffState, type ThemeSource } from './runtime.js';
 import type { EventCatalog, EventName, ThemeStore } from './types.js';
+export type { RuntimeSetup } from './host.js';
+export type { ThemeSource } from './runtime.js';
 
 // --- Connecting a theme to the app ---
 
-/** A theme's classes: its pages, and the layout around them. */
-export interface ThemeSource {
-  readonly pages: Readonly<Record<string, ComponentClass>>;
-  readonly layout?: ComponentClass;
-}
-
-/** What a theme runtime starts from, for a connection of the app's own (the worker sandbox). */
-export interface RuntimeSetup {
-  readonly theme: ThemeSource;
-  readonly events: Readonly<Record<string, EventInfo>>;
-  readonly state: object;
-}
-
 /** The theme runs in the app's own thread. */
-export function connectInThread({ theme, events, state }: RuntimeSetup): Connect {
-  return (deliver) => {
-    const runtime = createRuntime({ pages: theme.pages, layout: theme.layout, events, state, post: deliver });
+export function connectInThread({ theme, events }: RuntimeSetup): Connect {
+  return (deliver, { state, page }) => {
+    const runtime = createRuntime({ pages: theme.pages, layout: theme.layout, events, state, page, post: deliver });
     return { send: (message) => runtime.receive(message), close: () => runtime.dispose() };
   };
 }
+
+/** Errors after which the theme shows nothing at all: its frame failed, it didn't start, or it was stopped after too many restarts. */
+const THEME_FAILURES = new Set(['layout', 'start', 'runtime']);
 
 /** The running theme, as the app's code reaches it with useTheme(). */
 export interface ThemeHandle {
@@ -82,8 +73,12 @@ export interface ThemeAppConfig<App> {
   /** Where problems go; the console by default. */
   onError?(error: ThemeError): void;
   onTrack?(name: string): void;
-  /** How to reach the theme runtime; in this thread by default. */
+  /** How to reach the theme runtime; in this thread by default, or `connectWorker(…)` from livrea/host for the sandbox. */
   connect?(setup: RuntimeSetup): Connect;
+  /** How often a theme that crashed or stopped answering is started again; see ThemeClientOptions. */
+  restarts?: { readonly max: number; readonly withinMs: number };
+  /** How long the theme may take to start before the fallbacks show; 5 s by default. */
+  startTimeoutMs?: number;
 }
 
 export interface ThemeApp {
@@ -110,7 +105,10 @@ export function createThemeApp<App>(config: ThemeAppConfig<App>): ThemeApp {
   function start(theme: ThemeSource, state: ThemeStore, latestApp: { readonly current: App }): ThemeHandle {
     const handle = {} as { client: ThemeClient; emit: ThemeHandle['emit'] };
     handle.client = new ThemeClient({
-      connect: (config.connect ?? connectInThread)({ theme, events: config.events, state }),
+      connect: (config.connect ?? connectInThread)({ theme, events: config.events }),
+      state,
+      restarts: config.restarts,
+      startTimeoutMs: config.startTimeoutMs,
       policy,
       events: config.events,
       onAction(name, args) {
@@ -132,12 +130,14 @@ export function createThemeApp<App>(config: ThemeAppConfig<App>): ThemeApp {
     latestApp.current = app;
     const [handle] = useState(() => start(theme, state, latestApp));
 
-    // Before paint, so the theme's part of the screen changes with the rest; only when the data really changed.
+    // Before paint, so the theme's part of the screen changes with the rest. Only what changed is sent: the
+    // theme keeps everything else as it was, so nothing that reads it renders again.
     const sent = useRef(state);
     useLayoutEffect(() => {
-      if (structuralEqual(sent.current, state)) return;
+      const patches = diffState(sent.current, state);
+      if (!patches.length) return;
       sent.current = state;
-      handle.client.setState(state);
+      handle.client.patchState(patches);
     });
 
     // Closed once the provider is really gone. StrictMode unmounts and mounts again at once in development:
@@ -198,7 +198,7 @@ interface ThemeContextValue {
  */
 class Frame {
   rooted = false;
-  layoutFailed = false;
+  failed = false;
   page: { readonly owner: object; readonly fallback: ReactNode; failed: boolean } | null = null;
   version = 0;
   readonly #listeners = new Set<() => void>();
@@ -252,12 +252,16 @@ function useThemeContext(): ThemeContextValue {
  * the app's routes with their ThemePages: under the root they render nothing.
  * If the layout fails, `fallback` shows instead; given as a function, it gets
  * the children to place, and the ThemePages then show their own fallbacks.
+ * So does a theme that doesn't start in time, or keeps crashing. While the
+ * theme starts (in a worker, a fraction of a second), `pending` shows.
  */
 export function ThemeRoot({
   fallback = null,
+  pending = null,
   children
 }: {
   fallback?: ReactNode | ((children: ReactNode) => ReactNode);
+  pending?: ReactNode;
   children?: ReactNode;
 }) {
   const { client, frame } = useThemeContext();
@@ -268,11 +272,11 @@ export function ThemeRoot({
   useLayoutEffect(() => {
     frame.rooted = true;
     // A layout fails as the theme starts, before anything listens.
-    frame.layoutFailed = client.hasFailed('layout');
+    frame.failed = [...THEME_FAILURES].some((where) => client.hasFailed(where));
     frame.changed();
     const stop = client.onError((error) => {
-      if (error.where !== 'layout') return;
-      frame.layoutFailed = true;
+      if (!THEME_FAILURES.has(error.where)) return;
+      frame.failed = true;
       frame.changed();
     });
     return () => {
@@ -282,8 +286,9 @@ export function ThemeRoot({
     };
   }, [client, frame]);
 
-  if (frame.layoutFailed) return createElement(Fragment, null, typeof fallback === 'function' ? fallback(children) : fallback, typeof fallback === 'function' ? null : children);
-  return createElement(Fragment, null, createElement(ThemeStyles), root ? createElement(ThemeUnit, { id: root }) : null, children);
+  if (frame.failed) return createElement(Fragment, null, typeof fallback === 'function' ? fallback(children) : fallback, typeof fallback === 'function' ? null : children);
+  // Until the theme's first tree: `pending`, such as the app's own splash. The pages are mounted all along, so the theme knows which to show.
+  return createElement(Fragment, null, createElement(ThemeStyles), root ? createElement(ThemeUnit, { id: root }) : pending, children);
 }
 
 /**
@@ -333,8 +338,9 @@ export function ThemePage({ page, params, fallback = null }: { page: string; par
   useLayoutEffect(() => {
     fail(false);
     shownKey.current = key;
+    if ([...THEME_FAILURES].some((where) => client.hasFailed(where))) fail(true);
     const stop = client.onError((error) => {
-      if (error.where === 'page') fail(true);
+      if (error.where === 'page' || THEME_FAILURES.has(error.where)) fail(true);
     });
     client.showPage(page, latestParams.current);
     return () => {
@@ -351,8 +357,8 @@ export function ThemePage({ page, params, fallback = null }: { page: string; par
     client.showPage(page, latestParams.current);
   }, [client, page, key, fail]);
 
-  if (frame.rooted && !frame.layoutFailed) return null;
-  if (failed || frame.layoutFailed) return createElement(Fragment, null, fallback);
+  if (frame.rooted && !frame.failed) return null;
+  if (failed || frame.failed) return createElement(Fragment, null, fallback);
   return createElement(Fragment, null, createElement(ThemeStyles), outlet ? createElement(ThemeUnit, { id: outlet }) : null);
 }
 
@@ -410,8 +416,10 @@ function withCallbacks(props: OutProps, client: ThemeClient): Record<string, unk
   for (const [key, value] of Object.entries(props)) {
     if (value !== null && typeof value === 'object' && '$fn' in value) {
       const fn = (value as { $fn: number }).$fn;
+      // The run it came from: after a restart the same id is another function, so an old callback must do nothing.
+      const run = client.run;
       // Events, elements and anything else that isn't data stay on the app's side.
-      out[key] = (...args: unknown[]) => client.invoke(fn, args.map((arg) => (isPlainData(arg) ? arg : undefined)));
+      out[key] = (...args: unknown[]) => client.invoke(fn, args.map((arg) => (isPlainData(arg) ? arg : undefined)), run);
     } else {
       out[key] = value;
     }

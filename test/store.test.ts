@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { computed, effect } from '../src/reactive.js';
-import { Store } from '../src/store.js';
+import { applyPatches, diffState, Store } from '../src/store.js';
 
 const initial = () => ({
   site: { name: 'Grand', address: { city: 'Udine' } },
@@ -79,3 +79,58 @@ describe('the store', () => {
     expect(title.get()).toBe('Risotto ai funghi');
   });
 });
+
+describe('state diffs', () => {
+  const before = () => ({
+    site: { name: 'Grand', address: { city: 'Udine' } },
+    menu: [{ id: 1, title: 'Risotto' }, { id: 2, title: 'Tiramisù' }],
+    tags: { spa: true, pool: true } as Record<string, boolean>
+  });
+
+  it('finds the paths that changed, as deep as both sides keep their shape', () => {
+    const after = before();
+    after.site.name = 'Grand View';
+    after.menu[1]!.title = 'Panna cotta';
+    expect(diffState(before(), after)).toEqual([
+      { path: ['site', 'name'], value: 'Grand View' },
+      { path: ['menu', 1, 'title'], value: 'Panna cotta' }
+    ]);
+    expect(diffState(before(), before())).toEqual([]);
+  });
+
+  it('replaces an object that lost keys, and an array whose length changed', () => {
+    const after = before();
+    delete after.tags.pool;
+    after.menu.push({ id: 3, title: 'Gelato' });
+    expect(diffState(before(), after)).toEqual([
+      { path: ['menu'], value: after.menu },
+      { path: ['tags'], value: { spa: true } }
+    ]);
+  });
+
+  it('adds new keys one by one', () => {
+    const after = { ...before(), weather: { sky: 'clear' } };
+    expect(diffState(before(), after)).toEqual([{ path: ['weather'], value: { sky: 'clear' } }]);
+  });
+
+  it('gives back the new state when applied, sharing what didn’t change', () => {
+    const old = before();
+    const next = before();
+    next.site.address.city = 'Trieste';
+    next.menu[0]!.title = 'Risotto ai funghi';
+    next.tags.gym = true;
+    const result = applyPatches(old, diffState(old, next));
+    expect(result).toEqual(next);
+    expect(result.menu[1]).toBe(old.menu[1]);
+    expect(old.site.address.city).toBe('Udine');
+  });
+
+  it('copies an object once, however many patches go through it', () => {
+    const texts = Object.fromEntries(Array.from({ length: 200 }, (_, i) => [`t${i}`, `it ${i}`]));
+    const patches = Object.keys(texts).map((key) => ({ path: ['texts', key], value: key.replace('t', 'en ') }));
+    const result = applyPatches({ texts }, patches);
+    expect(result.texts.t199).toBe('en 199');
+    expect(texts.t199).toBe('it 199');
+  });
+});
+

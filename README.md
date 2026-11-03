@@ -28,7 +28,7 @@ Every B2B, kiosk, hospitality, or fleet application eventually hits the customis
 
 1. **Three-level inheritance:** *App Base Classes → Parent Theme → Child Theme.* Your app ships base classes for its pages (`HomePage`, `MenuPage`, `CheckoutPage`). A parent theme defines a brand or layout family; a customer's child theme overrides only a couple of slots or files and automatically inherits updates to the rest.
 2. **Fine-grained reactivity by default:** Theme data comes from a read-only store via path-tracked selectors (`select()`), and behaviour from Ext JS-style listeners (`on()`) and a typed event catalog. Only the exact unit (layout, page, slot, or component) that read a changed path re-renders and crosses the wire.
-3. **Built for untrusted code—or fast first-party themes:** Themes never touch the DOM or your app's internals. They emit a serialisable tree of elements and opaque host component placeholders (`remote-dom` style). Run them inside a Worker + Hardened JS (SES) sandbox for third-party authors, or in the main thread (`connectInThread`) for first-party themes with zero code changes.
+3. **Built for untrusted code—or fast first-party themes:** Themes never touch the DOM or your app's internals. They emit a serialisable tree of elements and opaque host component placeholders (`remote-dom` style). Run them in a dedicated Worker (`connectWorker` + `serveRuntime`) for third-party authors, or in the main thread (`connectInThread`) for first-party themes with zero code changes.
 4. **Zero dependencies:** One lightweight package (`livrea`, `livrea/runtime`, `livrea/host`, `livrea/react`), with React as an optional peer dependency.
 
 ---
@@ -111,6 +111,31 @@ export const { ThemeProvider, useTheme } = createThemeApp({
 </ThemeProvider>
 ```
 
+### Running themes in a worker
+
+Themes from other authors run in a dedicated Worker: no DOM, nothing of your app's to call, and a frozen theme can't freeze your app. Two small files:
+
+```ts
+// theme.worker.ts: loads the theme after blocking what you don't want themes to have
+import { serveRuntime } from 'livrea/worker';
+
+serveRuntime({
+  theme: async () => (await import('./themes/lacquer')).LACQUER,
+  block: { storage: true }   // network, storage, workers: nothing is blocked by default
+});
+```
+
+```ts
+// in createThemeApp's config
+connect: connectWorker(() => new Worker(new URL('./theme.worker.ts', import.meta.url), { type: 'module' })),
+```
+
+- **Early start:** `connectWorker` starts the worker when your module loads, so the theme loads while your app renders.
+- **Startup:** `<ThemeRoot pending={<Splash />}>` shows `pending` until the first tree. A theme that doesn't start within `startTimeoutMs` (5 s) shows the fallbacks.
+- **Watchdog and restarts:** a worker that doesn't answer for 3 s, or crashes while starting, is restarted with the state and page as they are then. The old screen stays until the new tree replaces it. The layout comes back with the same unit ids, so your components in it (an avatar) keep their state. Taps meanwhile, and callbacks from the old run, do nothing. After `restarts.max` (3 a minute), the theme has failed and the fallbacks show.
+- **Only what changed crosses:** the provider diffs the store and sends patches, so the theme keeps everything else as it was and nothing that reads it renders again.
+- **Your CSP** decides where `import()` may load from: it can't be blocked from inside the worker.
+
 ---
 
 ## Documentation
@@ -129,18 +154,18 @@ Livrea ships as a single zero-dependency package with tree-shakeable subpath exp
 | `livrea` | Authoring themes and base page classes (`Component`, `Layout`, `Outlet`, `slot`, `select`, `on`, `hostComponent`, `css`). |
 | `livrea/jsx-runtime` | Lightweight JSX factory (`/** @jsxImportSource livrea */`) that builds plain serialisable nodes without touching a DOM. |
 | `livrea/runtime` | Runs theme classes inside the sandbox (`createRuntime`, `Store`) and communicates via structured-clonable messages. |
-| `livrea/host` | Host-side client (`ThemeClient`, `HostTree`, `sanitizeOps`, `sanitizeCss`) that validates every update against your `HostPolicy`. |
-| `livrea/react` | React bindings (`createThemeApp`, `ThemePage`, `ThemeClientProvider`, `read`). |
+| `livrea/host` | Host-side client (`ThemeClient`, `HostTree`, `sanitizeOps`, `sanitizeCss`) that validates every update against your `HostPolicy`, and `connectWorker`. |
+| `livrea/worker` | The theme's side of the worker sandbox (`serveRuntime`, `block`). |
+| `livrea/react` | React bindings (`createThemeApp`, `ThemePage`, `ThemeRoot`, `ThemeClientProvider`, `read`). |
 
 ---
 
 ## Roadmap & Packaging Strategy
 
-**Current status:** `0.1.0` (early). The core reactive engine, class inheritance model, slot fallback chain, protocol, host sanitiser, and React integration are complete and tested.
+**Current status:** `0.1.0` (early). The core reactive engine, class inheritance model, slot fallback chain, protocol, host sanitiser, React integration and the worker sandbox are complete and tested.
 
 ### Upcoming Milestones
 
-- **Sandbox loader:** A Web Worker with a Hardened JavaScript (SES) compartment (with QuickJS-in-WebAssembly as a fallback option) that evaluates compiled theme modules in strict isolation.
 - **The `pack` tool (`@livrea/cli`):** Type-checks, compiles, and bundles a theme folder into a single verifiable `.livrea` archive (`theme.json`, `source/`, compiled `build/`, and SHA-256 `manifest.json`) so production servers never need to compile TSX on the fly.
 - **CSS scoping per class:** Automatic per-class selector scoping so a page's styles never bleed into other pages.
 
@@ -148,9 +173,7 @@ Livrea ships as a single zero-dependency package with tree-shakeable subpath exp
 
 **Do we need a workspace today?** Not yet. Right now, `livrea` is a single package with **zero runtime dependencies**: `livrea`, `livrea/runtime`, `livrea/host`, and `livrea/react` (with React optional). Apps install one package and get nothing they don't use.
 
-A workspace becomes worth it with the first piece that carries external dependencies of its own:
-1. **The `pack` tool**, which depends on TypeScript and `esbuild`.
-2. **The sandbox loader**, which depends on a JavaScript-hardening library (`ses`).
+A workspace becomes worth it with the first piece that carries external dependencies of its own: **the `pack` tool**, which depends on TypeScript and `esbuild`. (The worker sandbox needed none: the app trusts nothing the worker sends, so no hardening library is needed inside it.)
 
 At that point, the repository will split into `packages/livrea` and `packages/cli`—following the same pattern as Vite or Astro, where the core package remains unscoped (`livrea`) and tooling/helpers live under a scope (`@livrea/cli`). We will make that transition when building the CLI.
 

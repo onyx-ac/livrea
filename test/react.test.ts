@@ -1,17 +1,18 @@
 // @vitest-environment jsdom
 import { act, createElement, StrictMode, type ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { Component, css } from '../src/index.js';
-import { ThemeClient } from '../src/host.js';
+import { ThemeClient, type Connect } from '../src/host.js';
 import { createContext, useContext, useState } from 'react';
-import { createThemeApp, hostNames, read, ThemeClientProvider, ThemePage, ThemeRoot, type HostComponents } from '../src/react.js';
-import { Broken, BrokenFrame, Frame, One, Two } from './frame.js';
+import { connectInThread, createThemeApp, hostNames, type RuntimeSetup, read, ThemeClientProvider, ThemePage, ThemeRoot, type HostComponents } from '../src/react.js';
+import { AvatarFrame, Broken, BrokenFrame, Frame, One, Two } from './frame.js';
 import { on } from '../src/index.js';
 import { createRuntime, type ComponentClass } from '../src/runtime.js';
 import { HomePage } from './base.js';
 import { createKeyed } from './keyed.js';
 import { EVENTS, POLICY, STATE } from './harness.js';
+import type { AppMessage } from '../src/protocol.js';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -231,6 +232,40 @@ describe('createThemeApp', () => {
   });
 });
 
+describe('createThemeApp across a worker’s boundary', () => {
+  it('sends only what changed, so a list the app builds again each render isn’t rendered again', () => {
+    let rename!: (name: string) => void;
+    function App({ children }: { children: ReactNode }) {
+      const [name, setName] = useState('Grand');
+      rename = setName;
+      return createElement(AppContext.Provider, { value: name }, children);
+    }
+    const AppContext = createContext('');
+    // Messages are copied both ways, as a worker's are: nothing keeps its identity across.
+    const copied = (setup: RuntimeSetup): Connect => (deliver, { state }) => {
+      const runtime = createRuntime({ pages: setup.theme.pages, events: setup.events, state: structuredClone(state), post: (m) => deliver(structuredClone(m)) });
+      return { send: (message: AppMessage) => runtime.receive(structuredClone(message)) };
+    };
+    const app = createThemeApp({
+      theme: { pages: { home: HomePage } },
+      events: EVENTS!,
+      components,
+      useApp: () => useContext(AppContext),
+      // A new array of new objects on every render.
+      store: (name) => ({ site: { name }, categories: STATE.categories.map((category) => ({ ...category })), menu: STATE.menu }),
+      connect: copied
+    });
+    const container = document.createElement('div');
+    document.body.append(container);
+    act(() => createRoot(container).render(createElement(App, null, createElement(app.ThemeProvider, null, createElement(ThemePage, { page: 'home' })))));
+    expect(renders).toEqual(['Spa', 'Events']);
+    renders.length = 0;
+    act(() => rename('Grand View'));
+    expect(container.querySelector('h1')!.textContent).toBe('Grand View');
+    expect(renders).toEqual([]);
+  });
+});
+
 describe('ThemeRoot', () => {
   function frame(layout: ComponentClass, pages: Record<string, ComponentClass>) {
     const client = new ThemeClient({
@@ -293,6 +328,82 @@ describe('ThemeRoot', () => {
   it('shows its own fallback if the layout fails, and the pages show theirs', () => {
     const app = frame(BrokenFrame, { one: One });
     app.show(createElement(ThemePage, { page: 'one', fallback: createElement('p', null, 'old page') }));
+    expect(app.container.innerHTML).toBe('<section><p>old page</p></section>');
+  });
+
+  /** The theme in this thread, behind a connection the test controls: it delivers when told to, and can be lost. */
+  function controlled(layout: ComponentClass, pages: Record<string, ComponentClass>, options: { held?: boolean; startTimeoutMs?: number } = {}) {
+    const link = { lose: (_reason: string) => {}, release: () => {}, connections: 0, holdNext: false };
+    const client = new ThemeClient({
+      connect: (deliver, setup) => {
+        link.connections++;
+        link.lose = setup.lost;
+        const held: unknown[] = [];
+        let holding = link.connections === 1 ? (options.held ?? false) : link.holdNext;
+        link.release = () => {
+          holding = false;
+          held.splice(0).forEach(deliver);
+        };
+        return connectInThread({ theme: { pages, layout }, events: EVENTS! })((message) => (holding ? held.push(message) : deliver(message)), setup);
+      },
+      state: STATE,
+      startTimeoutMs: options.startTimeoutMs,
+      policy: { ...POLICY, hosts: hostNames(components) },
+      events: EVENTS!,
+      onAction: () => {}
+    });
+    client.onError(() => {});
+    const container = document.createElement('div');
+    document.body.append(container);
+    const page = createElement(ThemePage, { page: 'one', fallback: createElement('p', null, 'old page') });
+    act(() =>
+      createRoot(container).render(
+        createElement(
+          ThemeClientProvider,
+          { client, components },
+          createElement(ThemeRoot, { fallback: (pages: ReactNode) => createElement('section', null, pages), pending: createElement('p', null, 'splash') }, page)
+        )
+      )
+    );
+    return { container, link, client };
+  }
+
+  it('shows `pending` until the theme’s first tree, then the theme', () => {
+    const app = controlled(Frame, { one: One }, { held: true });
+    expect(app.container.innerHTML).toBe('<p>splash</p>');
+    act(() => app.link.release());
+    expect(app.container.innerHTML).toBe('<div class="frame"><p>one</p></div>');
+  });
+
+  it('shows the fallbacks when the theme doesn’t start in time', async () => {
+    vi.useFakeTimers();
+    try {
+      const app = controlled(Frame, { one: One }, { held: true, startTimeoutMs: 50 });
+      await act(async () => vi.advanceTimersByTime(50));
+      expect(app.container.innerHTML).toBe('<section><p>old page</p></section>');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('keeps the screen, and the app’s components in the layout, through a restart', () => {
+    const app = controlled(AvatarFrame, { one: One });
+    const avatar = app.container.querySelector('.avatar');
+    expect(app.container.innerHTML).toBe('<div class="frame"><div class="avatar"></div><p>one</p></div>');
+    // The new run's first tree is held, as a worker's takes a while: meanwhile the old screen stays.
+    app.link.holdNext = true;
+    act(() => app.link.lose('it stopped answering'));
+    expect(app.link.connections).toBe(2);
+    expect(app.container.innerHTML).toBe('<div class="frame"><div class="avatar"></div><p>one</p></div>');
+    act(() => app.link.release());
+    expect(app.container.innerHTML).toBe('<div class="frame"><div class="avatar"></div><p>one</p></div>');
+    expect(app.container.querySelector('.avatar')).toBe(avatar);
+  });
+
+  it('shows the fallbacks once the theme has been restarted too often', () => {
+    const app = controlled(Frame, { one: One });
+    for (let i = 0; i < 4; i++) act(() => app.link.lose('it crashed'));
+    expect(app.client.hasFailed('runtime')).toBe(true);
     expect(app.container.innerHTML).toBe('<section><p>old page</p></section>');
   });
 });
