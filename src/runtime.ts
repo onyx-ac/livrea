@@ -503,6 +503,7 @@ export function createRuntime(options: RuntimeOptions): Runtime {
   }
 
   function startOutlet(unit: Unit): void {
+    ops.push({ op: 'outlet', id: unit.id });
     start(unit, [() => renderPage(unit)], 'page');
   }
 

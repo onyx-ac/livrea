@@ -38,6 +38,8 @@ export interface FunctionRef {
 
 export type TreeOp =
   | { readonly op: 'root'; readonly id: string }
+  /** The unit where pages show: the layout's <Outlet />, or the root without a layout. */
+  | { readonly op: 'outlet'; readonly id: string }
   | { readonly op: 'set'; readonly id: string; readonly tree: readonly Out[] }
   | { readonly op: 'drop'; readonly id: string }
   | { readonly op: 'styles'; readonly id: string; readonly css: string };

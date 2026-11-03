@@ -1,11 +1,12 @@
 // @vitest-environment jsdom
-import { act, createElement, type ReactNode } from 'react';
+import { act, createElement, StrictMode, type ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, describe, expect, it } from 'vitest';
 import { Component, css } from '../src/index.js';
 import { ThemeClient } from '../src/host.js';
 import { createContext, useContext, useState } from 'react';
-import { createThemeApp, hostNames, read, ThemeClientProvider, ThemePage, type HostComponents } from '../src/react.js';
+import { createThemeApp, hostNames, read, ThemeClientProvider, ThemePage, ThemeRoot, type HostComponents } from '../src/react.js';
+import { Broken, BrokenFrame, Frame, One, Two } from './frame.js';
 import { on } from '../src/index.js';
 import { createRuntime, type ComponentClass } from '../src/runtime.js';
 import { HomePage } from './base.js';
@@ -194,7 +195,21 @@ describe('createThemeApp', () => {
     expect(app.navigations).toEqual([{ page: 'welcome' }]);
   });
 
-  it('closes the theme connection when ThemeProvider unmounts', () => {
+  it('keeps the theme running through StrictMode’s unmount and mount in development', async () => {
+    const container = document.createElement('div');
+    document.body.append(container);
+    await act(async () =>
+      createRoot(container).render(
+        createElement(StrictMode, null, createElement(AppState, null, createElement(kiosk.ThemeProvider, null, createElement(ThemePage, { page: 'home' }))))
+      )
+    );
+    await act(async () => new Promise((resolve) => setTimeout(resolve, 0)));
+    expect(container.querySelector('h1')!.textContent).toBe('Grand');
+    act(() => app.rename('Grand View'));
+    expect(container.querySelector('h1')!.textContent).toBe('Grand View');
+  });
+
+  it('closes the theme connection when ThemeProvider unmounts', async () => {
     const container = document.createElement('div');
     document.body.append(container);
     const root = createRoot(container);
@@ -210,6 +225,74 @@ describe('createThemeApp', () => {
       originalClose();
     };
     act(() => root.unmount());
+    // A tick later: a mount in between (StrictMode) would have kept it.
+    await new Promise((resolve) => setTimeout(resolve, 0));
     expect(closed).toBe(true);
+  });
+});
+
+describe('ThemeRoot', () => {
+  function frame(layout: ComponentClass, pages: Record<string, ComponentClass>) {
+    const client = new ThemeClient({
+      connect: (deliver) => {
+        const runtime = createRuntime({ pages, layout, events: EVENTS, state: STATE, post: deliver });
+        return { send: (message) => runtime.receive(message) };
+      },
+      policy: { ...POLICY, hosts: hostNames(components) },
+      events: EVENTS!,
+      onAction: () => {}
+    });
+    const container = document.createElement('div');
+    document.body.append(container);
+    const root = createRoot(container);
+    const show = (page: ReactNode) =>
+      act(() =>
+        root.render(
+          createElement(
+            ThemeClientProvider,
+            { client, components },
+            createElement(ThemeRoot, { fallback: (pages: ReactNode) => createElement('section', null, pages) }, page)
+          )
+        )
+      );
+    return { container, show };
+  }
+
+  it('keeps the layout while pages come and go', () => {
+    const app = frame(Frame, { one: One, two: Two });
+    app.show(createElement(ThemePage, { key: 'one', page: 'one' }));
+    expect(app.container.innerHTML).toBe('<div class="frame"><p>one</p></div>');
+    const layout = app.container.firstElementChild;
+    app.show(createElement(ThemePage, { key: 'two', page: 'two' }));
+    expect(app.container.innerHTML).toBe('<div class="frame"><p>two</p></div>');
+    expect(app.container.firstElementChild).toBe(layout);
+  });
+
+  it('shows a failing page’s fallback inside the layout', () => {
+    const app = frame(Frame, { broken: Broken });
+    app.show(createElement(ThemePage, { page: 'broken', fallback: createElement('p', null, 'old page') }));
+    expect(app.container.innerHTML).toBe('<div class="frame"><p>old page</p></div>');
+  });
+
+  it('shows a page without the layout when there is no ThemeRoot', () => {
+    const client = new ThemeClient({
+      connect: (deliver) => {
+        const runtime = createRuntime({ pages: { one: One }, layout: Frame, events: EVENTS, state: STATE, post: deliver });
+        return { send: (message) => runtime.receive(message) };
+      },
+      policy: { ...POLICY, hosts: hostNames(components) },
+      events: EVENTS!,
+      onAction: () => {}
+    });
+    const container = document.createElement('div');
+    document.body.append(container);
+    act(() => createRoot(container).render(createElement(ThemeClientProvider, { client, components }, createElement(ThemePage, { page: 'one' }))));
+    expect(container.innerHTML).toBe('<p>one</p>');
+  });
+
+  it('shows its own fallback if the layout fails, and the pages show theirs', () => {
+    const app = frame(BrokenFrame, { one: One });
+    app.show(createElement(ThemePage, { page: 'one', fallback: createElement('p', null, 'old page') }));
+    expect(app.container.innerHTML).toBe('<section><p>old page</p></section>');
   });
 });

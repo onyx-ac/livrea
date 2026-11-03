@@ -140,7 +140,15 @@ export function createThemeApp<App>(config: ThemeAppConfig<App>): ThemeApp {
       handle.client.setState(state);
     });
 
-    useEffect(() => () => handle.client.close(), [handle]);
+    // Closed once the provider is really gone. StrictMode unmounts and mounts again at once in development:
+    // the close waits a tick, and a mount in between cancels it, so the same client keeps running.
+    const closing = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+    useEffect(() => {
+      clearTimeout(closing.current);
+      return () => {
+        closing.current = setTimeout(() => handle.client.close(), 0);
+      };
+    }, [handle]);
 
     const before = useRef(app);
     useEffect(() => {
@@ -180,6 +188,37 @@ export type HostComponents = Readonly<Record<string, ComponentType<HostComponent
 interface ThemeContextValue {
   readonly client: ThemeClient;
   readonly components: HostComponents;
+  readonly frame: Frame;
+}
+
+/**
+ * What a ThemeRoot shares with the ThemePages under it: whether it renders the
+ * tree (so pages only say which page shows), whether the layout failed, and
+ * the current page's fallback, shown in the layout's outlet if the page fails.
+ */
+class Frame {
+  rooted = false;
+  layoutFailed = false;
+  page: { readonly owner: object; readonly fallback: ReactNode; failed: boolean } | null = null;
+  version = 0;
+  readonly #listeners = new Set<() => void>();
+
+  readonly subscribe = (listener: () => void): (() => void) => {
+    this.#listeners.add(listener);
+    return () => this.#listeners.delete(listener);
+  };
+
+  readonly read = (): number => this.version;
+
+  changed(): void {
+    this.version++;
+    for (const listener of [...this.#listeners]) listener();
+  }
+}
+
+function useFrame(frame: Frame): Frame {
+  useSyncExternalStore(frame.subscribe, frame.read, frame.read);
+  return frame;
 }
 
 const ThemeContext = createContext<ThemeContextValue | null>(null);
@@ -191,7 +230,8 @@ export function hostNames(components: HostComponents): ReadonlySet<string> {
 
 /** The low-level provider, for an app that makes its own ThemeClient; createThemeApp() uses it. */
 export function ThemeClientProvider({ client, components, children }: { client: ThemeClient; components: HostComponents; children?: ReactNode }) {
-  const value = useMemo(() => ({ client, components }), [client, components]);
+  const [frame] = useState(() => new Frame());
+  const value = useMemo(() => ({ client, components, frame }), [client, components, frame]);
   return createElement(ThemeContext.Provider, { value }, children);
 }
 
@@ -206,44 +246,114 @@ function useThemeContext(): ThemeContextValue {
 }
 
 /**
+ * Renders the theme's whole tree, layout included, for as long as it's
+ * mounted: the frame around pages (and anything in it, such as an avatar)
+ * stays put while ThemePages come and go. `children` is what chooses the page,
+ * the app's routes with their ThemePages: under the root they render nothing.
+ * If the layout fails, `fallback` shows instead; given as a function, it gets
+ * the children to place, and the ThemePages then show their own fallbacks.
+ */
+export function ThemeRoot({
+  fallback = null,
+  children
+}: {
+  fallback?: ReactNode | ((children: ReactNode) => ReactNode);
+  children?: ReactNode;
+}) {
+  const { client, frame } = useThemeContext();
+  useFrame(frame);
+  const readRoot = useCallback(() => client.tree.root, [client]);
+  const root = useSyncExternalStore(client.subscribe, readRoot, readRoot);
+
+  useLayoutEffect(() => {
+    frame.rooted = true;
+    // A layout fails as the theme starts, before anything listens.
+    frame.layoutFailed = client.hasFailed('layout');
+    frame.changed();
+    const stop = client.onError((error) => {
+      if (error.where !== 'layout') return;
+      frame.layoutFailed = true;
+      frame.changed();
+    });
+    return () => {
+      stop();
+      frame.rooted = false;
+      frame.changed();
+    };
+  }, [client, frame]);
+
+  if (frame.layoutFailed) return createElement(Fragment, null, typeof fallback === 'function' ? fallback(children) : fallback, typeof fallback === 'function' ? null : children);
+  return createElement(Fragment, null, createElement(ThemeStyles), root ? createElement(ThemeUnit, { id: root }) : null, children);
+}
+
+/**
  * Shows a page of the theme while it's mounted, in place of the view a route
  * used to render. If the page fails, `fallback` shows instead, so the screen
  * is never empty; a failing slot falls back to its base version on its own.
+ * Under a ThemeRoot it renders nothing itself: the page shows in the layout's
+ * outlet, and so does its fallback.
  */
 export function ThemePage({ page, params, fallback = null }: { page: string; params?: Readonly<Record<string, unknown>>; fallback?: ReactNode }) {
-  const { client } = useThemeContext();
+  const { client, frame } = useThemeContext();
+  useFrame(frame);
   const [failed, setFailed] = useState(false);
-  const readRoot = useCallback(() => client.tree.root, [client]);
-  const root = useSyncExternalStore(client.subscribe, readRoot, readRoot);
+  const [owner] = useState(() => ({}));
+  // On its own, the page shows without the layout: the frame is ThemeRoot's.
+  const readOutlet = useCallback(() => client.tree.outlet, [client]);
+  const outlet = useSyncExternalStore(client.subscribe, readOutlet, readOutlet);
   const key = JSON.stringify(params ?? {});
   const latestParams = useRef(params);
   latestParams.current = params;
 
   const shownKey = useRef(key);
 
+  // Under a ThemeRoot, the fallback shows in the outlet: it's registered with the frame.
+  const latestFallback = useRef(fallback);
+  latestFallback.current = fallback;
+  const fail = useCallback(
+    (value: boolean) => {
+      setFailed(value);
+      if (frame.page?.owner !== owner || frame.page.failed === value) return;
+      frame.page.failed = value;
+      frame.changed();
+    },
+    [frame, owner]
+  );
+
   useLayoutEffect(() => {
-    setFailed(false);
+    frame.page = { owner, fallback: latestFallback.current, failed: false };
+    frame.changed();
+    return () => {
+      if (frame.page?.owner !== owner) return;
+      frame.page = null;
+      frame.changed();
+    };
+  }, [frame, owner]);
+
+  useLayoutEffect(() => {
+    fail(false);
     shownKey.current = key;
     const stop = client.onError((error) => {
-      if (error.where === 'page') setFailed(true);
+      if (error.where === 'page') fail(true);
     });
     client.showPage(page, latestParams.current);
     return () => {
       stop();
       client.showPage(null);
     };
-  }, [client, page]);
+  }, [client, page, fail]);
 
   // The same page with new parameters: it updates in place, without leaving.
   useLayoutEffect(() => {
     if (shownKey.current === key) return;
     shownKey.current = key;
-    setFailed(false);
+    fail(false);
     client.showPage(page, latestParams.current);
-  }, [client, page, key]);
+  }, [client, page, key, fail]);
 
-  if (failed) return createElement(Fragment, null, fallback);
-  return createElement(Fragment, null, createElement(ThemeStyles), root ? createElement(ThemeUnit, { id: root }) : null);
+  if (frame.rooted && !frame.layoutFailed) return null;
+  if (failed || frame.layoutFailed) return createElement(Fragment, null, fallback);
+  return createElement(Fragment, null, createElement(ThemeStyles), outlet ? createElement(ThemeUnit, { id: outlet }) : null);
 }
 
 /** The theme's styles, checked; nothing when it has none. */
@@ -261,8 +371,11 @@ export function ThemeStyles() {
 /** One unit of the tree; it re-renders only when the theme sends that unit again. */
 export function ThemeUnit({ id }: { id: string }) {
   const context = useThemeContext();
+  const frame = useFrame(context.frame);
   const read = useCallback(() => context.client.tree.unit(id), [context, id]);
   const nodes = useSyncExternalStore(context.client.subscribe, read, read);
+  // The current page failed: its fallback shows where pages show.
+  if (frame.rooted && frame.page?.failed && id === context.client.tree.outlet) return createElement(Fragment, null, frame.page.fallback);
   if (!nodes) return null;
   return createElement(Fragment, null, ...nodes.map((node, index) => renderNode(node, index, context)));
 }

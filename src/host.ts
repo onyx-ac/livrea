@@ -55,6 +55,7 @@ export function sanitizeOps(input: unknown, policy: HostPolicy, problem: Problem
     }
     switch (op.op) {
       case 'root':
+      case 'outlet':
       case 'drop':
         ops.push({ op: op.op, id: op.id });
         break;
@@ -249,6 +250,7 @@ function plainData(value: unknown, depth: number): unknown {
 /** The rendered tree on the app's side: units by id, and the theme's styles. Renderers subscribe to it. */
 export class HostTree {
   #root: string | null = null;
+  #outlet: string | null = null;
   readonly #units = new Map<string, readonly Out[]>();
   #styles: ReadonlyMap<string, string> = new Map();
   readonly #listeners = new Set<() => void>();
@@ -258,6 +260,9 @@ export class HostTree {
       switch (op.op) {
         case 'root':
           this.#root = op.id;
+          break;
+        case 'outlet':
+          this.#outlet = op.id;
           break;
         case 'set':
           this.#units.set(op.id, op.tree);
@@ -276,6 +281,11 @@ export class HostTree {
 
   get root(): string | null {
     return this.#root;
+  }
+
+  /** The unit where pages show. */
+  get outlet(): string | null {
+    return this.#outlet;
   }
 
   unit(id: string): readonly Out[] | undefined {
@@ -342,6 +352,7 @@ export class ThemeClient {
   readonly #errorListeners = new Set<(error: ThemeError) => void>();
   readonly #connection: ThemeConnection;
   #nextAnswer = 1;
+  readonly #failed = new Set<string>();
 
   constructor(options: ThemeClientOptions) {
     this.#options = options;
@@ -387,6 +398,11 @@ export class ThemeClient {
       this.#answers.set(id, { settle, depth: this.#depth });
       this.#connection.send({ kind: 'event', id, name, payload });
     });
+  }
+
+  /** Whether this part of the theme (`layout`, `page`…) has reported an error, even before anyone listened. */
+  hasFailed(where: string): boolean {
+    return this.#failed.has(where);
   }
 
   onError(listener: (error: ThemeError) => void): () => void {
@@ -442,6 +458,7 @@ export class ThemeClient {
   }
 
   #error(error: ThemeError): void {
+    this.#failed.add(error.where);
     for (const listener of [...this.#errorListeners]) listener(error);
   }
 }
