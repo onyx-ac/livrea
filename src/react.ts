@@ -109,6 +109,8 @@ export function createThemeApp<App>(config: ThemeAppConfig<App>): ThemeApp {
       state,
       restarts: config.restarts,
       startTimeoutMs: config.startTimeoutMs,
+      // Opened when the provider mounts, not while it renders: a render React throws away opens nothing.
+      lazy: true,
       policy,
       events: config.events,
       onAction(name, args) {
@@ -140,11 +142,16 @@ export function createThemeApp<App>(config: ThemeAppConfig<App>): ThemeApp {
       handle.client.patchState(patches);
     });
 
+    // Opened as the provider mounts, before paint. A theme in this thread has sent its tree by then: `opened`
+    // renders what shows it again at once, so it's on the first frame.
     // Closed once the provider is really gone. StrictMode unmounts and mounts again at once in development:
     // the close waits a tick, and a mount in between cancels it, so the same client keeps running.
+    const [opened, setOpened] = useState(false);
     const closing = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-    useEffect(() => {
+    useLayoutEffect(() => {
       clearTimeout(closing.current);
+      handle.client.open();
+      setOpened(true);
       return () => {
         closing.current = setTimeout(() => handle.client.close(), 0);
       };
@@ -164,7 +171,7 @@ export function createThemeApp<App>(config: ThemeAppConfig<App>): ThemeApp {
     return createElement(
       HandleContext.Provider,
       { value: handle },
-      createElement(ThemeClientProvider, { client: handle.client, components: config.components }, children)
+      createElement(ThemeClientProvider, { client: handle.client, components: config.components, opened }, children)
     );
   }
 
@@ -229,9 +236,21 @@ export function hostNames(components: HostComponents): ReadonlySet<string> {
 }
 
 /** The low-level provider, for an app that makes its own ThemeClient; createThemeApp() uses it. */
-export function ThemeClientProvider({ client, components, children }: { client: ThemeClient; components: HostComponents; children?: ReactNode }) {
+export function ThemeClientProvider({
+  client,
+  components,
+  opened,
+  children
+}: {
+  client: ThemeClient;
+  components: HostComponents;
+  /** For a `lazy` client: set when it has opened, so what shows the theme renders again with what it sent. */
+  opened?: boolean;
+  children?: ReactNode;
+}) {
   const [frame] = useState(() => new Frame());
-  const value = useMemo(() => ({ client, components, frame }), [client, components, frame]);
+  // `opened` isn't read: it changes the value on purpose, so everything that reads the context renders again.
+  const value = useMemo(() => ({ client, components, frame }), [client, components, frame, opened]);
   return createElement(ThemeContext.Provider, { value }, children);
 }
 

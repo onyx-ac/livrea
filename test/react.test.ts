@@ -210,6 +210,33 @@ describe('createThemeApp', () => {
     expect(container.querySelector('h1')!.textContent).toBe('Grand View');
   });
 
+  it('opens one connection under StrictMode, which renders the provider twice', async () => {
+    let connections = 0;
+    let closed = 0;
+    const counted = createThemeApp({
+      theme: { pages: { home: Home } },
+      events: EVENTS!,
+      components: { Button: () => null, Avatar: () => null },
+      useApp: () => useContext(AppContext)!,
+      store: (app) => ({ site: { name: app.name }, categories: STATE.categories, menu: STATE.menu }),
+      connect: (setup) => (deliver, opening) => {
+        connections++;
+        const connection = connectInThread(setup)(deliver, opening);
+        return { send: connection.send, close: () => (closed++, connection.close?.()) };
+      }
+    });
+    const container = document.createElement('div');
+    document.body.append(container);
+    await act(async () =>
+      createRoot(container).render(
+        createElement(StrictMode, null, createElement(AppState, null, createElement(counted.ThemeProvider, null, createElement(ThemePage, { page: 'home' }))))
+      )
+    );
+    await act(async () => new Promise((resolve) => setTimeout(resolve, 0)));
+    expect(connections).toBe(1);
+    expect(closed).toBe(0);
+  });
+
   it('closes the theme connection when ThemeProvider unmounts', async () => {
     const container = document.createElement('div');
     document.body.append(container);
@@ -242,8 +269,8 @@ describe('createThemeApp across a worker’s boundary', () => {
     }
     const AppContext = createContext('');
     // Messages are copied both ways, as a worker's are: nothing keeps its identity across.
-    const copied = (setup: RuntimeSetup): Connect => (deliver, { state }) => {
-      const runtime = createRuntime({ pages: setup.theme.pages, events: setup.events, state: structuredClone(state), post: (m) => deliver(structuredClone(m)) });
+    const copied = (setup: RuntimeSetup): Connect => (deliver, { state, page }) => {
+      const runtime = createRuntime({ pages: setup.theme.pages, events: setup.events, state: structuredClone(state), page, post: (m) => deliver(structuredClone(m)) });
       return { send: (message: AppMessage) => runtime.receive(structuredClone(message)) };
     };
     const app = createThemeApp({

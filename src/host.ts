@@ -339,7 +339,7 @@ export interface RuntimeSetup {
 export interface ConnectionSetup {
   /** The app's state as it is now. */
   readonly state: object;
-  /** The page on screen, if any. */
+  /** The page on screen, if any: the runtime must start with it (`page` in RuntimeOptions), as it's sent nowhere else. */
   readonly page: PageShown | null;
   /** The runtime crashed or stopped answering: the client starts it again, with a new connection. */
   lost(reason: string): void;
@@ -370,6 +370,12 @@ export interface ThemeClientOptions {
   /** How long the theme may take to send its first tree before it has failed (`start`); 5 s by default. */
   startTimeoutMs?: number;
   /**
+   * Doesn't connect until `open()`. For React, where a render may be thrown
+   * away (StrictMode renders twice): a client made there must not start a
+   * worker that nothing will ever close.
+   */
+  lazy?: boolean;
+  /**
    * An action a listener sends while the app waits for its answer to a
    * cancellable event is a redirect (preventDefault, then navigate elsewhere).
    * This many levels are allowed, 1 by default, so themes can't bounce the app
@@ -393,7 +399,7 @@ export class ThemeClient {
   /** The redirect depth of the action being handled, while its handler starts. */
   #depth = 0;
   readonly #errorListeners = new Set<(error: ThemeError) => void>();
-  #connection: ThemeConnection;
+  #connection: ThemeConnection | null = null;
   #nextAnswer = 1;
   readonly #failed = new Set<string>();
   /** What a restarted theme starts from. */
@@ -411,6 +417,12 @@ export class ThemeClient {
   constructor(options: ThemeClientOptions) {
     this.#options = options;
     this.#state = options.state ?? {};
+    if (!options.lazy) this.open();
+  }
+
+  /** Connects to the theme, with the state and page as they are now; at once unless the client is `lazy`. Once only. */
+  open(): void {
+    if (this.#connection || this.#closed) return;
     this.#connection = this.#connect();
     // A theme in this thread has sent its tree by now; one in a worker gets a while to.
     if (!this.#started && !this.#closed) {
@@ -418,7 +430,7 @@ export class ThemeClient {
         if (this.#started) return;
         this.#error({ where: 'start', message: `The theme didn't start in ${this.#options.startTimeoutMs ?? 5000} ms.` });
         this.close();
-      }, options.startTimeoutMs ?? 5000);
+      }, this.#options.startTimeoutMs ?? 5000);
     }
   }
 
@@ -452,7 +464,7 @@ export class ThemeClient {
     this.#restarts = [...this.#restarts.filter((time) => now - time < withinMs), now];
     // A new run first: whatever the old one still sends as it closes (a runtime here tears its tree down) is dropped.
     this.#run++;
-    this.#connection.close?.();
+    this.#connection?.close?.();
     for (const answer of this.#answers.values()) answer.settle(false);
     if (this.#restarts.length > max) {
       this.#closed = true;
@@ -490,7 +502,8 @@ export class ThemeClient {
   }
 
   #send(message: AppMessage): void {
-    if (!this.#closed) this.#connection.send(message);
+    // Before open(), only kept: the state and page go with the connection when it opens.
+    if (!this.#closed) this.#connection?.send(message);
   }
 
   /** Sends an event of the catalog; resolves with whether a listener prevented it (always false for events that can't be). */
@@ -528,7 +541,7 @@ export class ThemeClient {
     for (const answer of this.#answers.values()) answer.settle(false);
     if (this.#closed) return;
     this.#closed = true;
-    this.#connection.close?.();
+    this.#connection?.close?.();
   }
 
   #receive(message: unknown): void {
