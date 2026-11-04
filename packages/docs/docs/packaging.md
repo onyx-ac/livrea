@@ -31,10 +31,10 @@ linen/
   "id": "linen",
   "name": "Linen",
   "version": "1.0.0",
-  "engine": "nakota-kiosk@1",
+  "engine": "hotel-kiosk@1",
   "parent": "lacquer",
-  "description": "Light and airy.",
-  "shared": ["@nakota/kiosk-theme"]
+  "description": { "EN": "Light and airy.", "IT": "Leggero e arioso." },
+  "shared": ["@hotel/kiosk-theme"]
 }
 ```
 
@@ -44,6 +44,7 @@ linen/
 | `version` | `x.y.z`. An app never accepts the same version with other content |
 | `engine` | The app API the theme is written for; the app decides which it runs |
 | `parent` | The theme it extends, for the admin to show |
+| `description` | For the admin to show: one text, or one per language with the app's language codes |
 | `entry` | The module whose default export is the theme; `src/index.ts(x)` by default |
 | `settings` | The module that exports its settings; `src/settings.ts` if there is one |
 | `shared` | Modules the app provides at runtime, such as its base pages: imported, never bundled |
@@ -75,7 +76,7 @@ import { importTheme, serveRuntime } from 'livrea/worker';
 import * as kit from './theme-kit';
 
 serveRuntime({
-  theme: () => importTheme(themeModuleUrl, { '@nakota/kiosk-theme': kit }),
+  theme: () => importTheme(themeModuleUrl, { '@hotel/kiosk-theme': kit }),
   block: { storage: true }
 });
 ```

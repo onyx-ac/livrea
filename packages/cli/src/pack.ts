@@ -1,7 +1,6 @@
 /**
  * `livrea pack`: a theme's folder into one package, `<id>-<version>.livrea`,
- * that an app's admin installs (Nakota's: docs/017-theme_page_classes.md
- * section 11.1). The package:
+ * that an app's admin installs. The package:
  *
  *   theme.json      the theme's own, as written
  *   build/theme.js  the theme as one ES module; Livrea and the app's shared
@@ -25,11 +24,15 @@ export interface ThemeJson {
   name: string;
   /** x.y.z; a package's version never changes once installed. */
   version: string;
-  /** The app API it's written for, e.g. "nakota-kiosk@1": the app decides which it runs. */
+  /** The app API it's written for, e.g. "hotel-kiosk@1": the app decides which it runs. */
   engine: string;
   /** The theme it extends, for the admin to show; the code says what it extends. */
   parent?: string;
-  description?: string;
+  /**
+   * What it looks like, for the app's admin: one text, or one per language
+   * ({ "EN": "…", "IT": "…" }), with the language codes the app uses.
+   */
+  description?: string | Record<string, string>;
   /** The module whose default export is the theme ({ pages, layout, settings }); src/index.ts(x) by default. */
   entry?: string;
   /** The module that exports its settings (defineSettings) as `settings`; src/settings.ts if there is one. */
@@ -97,7 +100,7 @@ function readThemeJson(dir: string): ThemeJson {
   if (typeof theme.id !== 'string' || !ID.test(theme.id)) throw new PackError('theme.json needs an id of lowercase letters, digits and dashes, e.g. "linen".');
   if (typeof theme.name !== 'string' || !theme.name.trim()) throw new PackError('theme.json needs a name.');
   if (typeof theme.version !== 'string' || !VERSION.test(theme.version)) throw new PackError('theme.json needs a version like 1.0.0.');
-  if (typeof theme.engine !== 'string' || !theme.engine) throw new PackError('theme.json needs the engine it is written for, e.g. "nakota-kiosk@1".');
+  if (typeof theme.engine !== 'string' || !theme.engine) throw new PackError('theme.json needs the engine it is written for, e.g. "hotel-kiosk@1".');
   if (theme.shared !== undefined && (!Array.isArray(theme.shared) || !theme.shared.every((name) => typeof name === 'string'))) {
     throw new PackError('theme.json\'s "shared" lists module names.');
   }
