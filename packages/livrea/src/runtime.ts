@@ -7,6 +7,7 @@
  * only when what it read changes, and sends only its own part of the tree.
  */
 import {
+  blockDefinition,
   Component,
   construct,
   hostName,
@@ -14,9 +15,13 @@ import {
   listenerDefinition,
   Outlet,
   RAW,
+  registeredBlocks,
   selectDefinition,
+  slot,
   slotDefinition,
+  type BlockDefinition,
   type ComponentContext,
+  type InternalBlockDefinition,
   type SlotDefinition
 } from './component.js';
 import { shallowEqual, structuralEqual } from './equality.js';
@@ -24,7 +29,7 @@ import { createEvent, LIFECYCLE_EVENTS, THEME_EVENT, type EventInfo } from './ev
 import type { Child, ComponentNode, Key, Node } from './jsx-runtime.js';
 import type { AppMessage, Out, OutProps, ThemeMessage, TreeOp } from './protocol.js';
 import { batch, Computed, effect, Signal, untrack, watch } from './reactive.js';
-import { resolveSetting, settingsCss, type SettingsSchema } from './settings.js';
+import { resolveSetting, resolveSettings, settingsCss, type BlockSchema, type SettingsSchema } from './settings.js';
 import { isRecord, Store } from './store.js';
 import type { Cleanup, EventName, ThemeSettings, ThemeStore } from './types.js';
 
@@ -51,6 +56,8 @@ export interface RuntimeOptions {
   page?: PageShown | null;
   /** The theme's settings (defineSettings), read from the store's `settings`. */
   settings?: SettingsSchema;
+  /** Reusable visual blocks (defineBlock) used by `field.blocks()` settings. */
+  blocks?: Readonly<Record<string, BlockDefinition<any, any>>> | readonly BlockDefinition<any, any>[];
 }
 
 /** A theme: its pages, by the names the app shows them by, and the frame around them. */
@@ -59,6 +66,8 @@ export interface ThemeSource {
   readonly layout?: ComponentClass;
   /** What the app's admin may change without code (defineSettings). */
   readonly settings?: SettingsSchema;
+  /** Reusable visual blocks (defineBlock) used by `field.blocks()` settings. */
+  readonly blocks?: Readonly<Record<string, BlockDefinition<any, any>>> | readonly BlockDefinition<any, any>[];
 }
 
 /** The page on screen, with its parameters. */
@@ -131,11 +140,25 @@ export function createRuntime(options: RuntimeOptions): Runtime {
     options.post({ kind: 'error', where, message: error instanceof Error ? error.message : String(error) });
 
   const schema = options.settings ?? {};
+  const blocks = new Map<string, BlockDefinition<any, any>>(registeredBlocks);
+  if (options.blocks) {
+    if (Array.isArray(options.blocks)) {
+      for (const item of options.blocks) blocks.set(item.id, item);
+    } else {
+      for (const [key, item] of Object.entries(options.blocks)) blocks.set(item.id || key, item);
+    }
+  }
+  const getBlockSchemas = (): Readonly<Record<string, BlockSchema>> | undefined => {
+    const entries: [string, BlockSchema][] = [];
+    for (const [id, block] of registeredBlocks) entries.push([id, block.schema]);
+    for (const [id, block] of blocks) entries.push([id, block.schema]);
+    return entries.length ? Object.fromEntries(entries) : undefined;
+  };
   // Each setting read through the tracked store, so what reads one renders again when the admin changes it.
   const readSetting = (name: string | symbol): unknown => {
     if (typeof name !== 'string' || !Object.hasOwn(schema, name)) return undefined;
     const given = (store.view as { settings?: Record<string, unknown> }).settings;
-    return resolveSetting(schema[name]!, given?.[name]);
+    return resolveSetting(schema[name]!, given?.[name], getBlockSchemas());
   };
   const settings: ThemeSettings = new Proxy({} as ThemeSettings, {
     get: (_, name) => readSetting(name),
@@ -151,6 +174,7 @@ export function createRuntime(options: RuntimeOptions): Runtime {
   const context: ComponentContext = {
     store: store.view as ThemeStore,
     settings,
+    blocks,
     setState(component, patch) {
       const instance = instances.get(component);
       if (!instance) return;
@@ -492,6 +516,11 @@ export function createRuntime(options: RuntimeOptions): Runtime {
       out.push({ t: 'u', id: childUnit(`s${definition.id}`, key, props, (unit) => startSlot(unit, definition)).id });
       return;
     }
+    const block = blockDefinition(type);
+    if (block) {
+      out.push({ t: 'u', id: childUnit(`b:${block.id}`, key, props, (unit) => startBlock(unit, block)).id });
+      return;
+    }
     if (isComponentClass(type)) {
       out.push({ t: 'u', id: childUnit(`k${classId(type)}`, key, props, (unit) => startComponent(unit, type)).id });
       return;
@@ -529,6 +558,36 @@ export function createRuntime(options: RuntimeOptions): Runtime {
         return untrack(() => link.render(props));
       }),
       `slot ${definition.name}`
+    );
+  }
+
+  function startBlock(unit: Unit, block: InternalBlockDefinition): void {
+    unit.owner = unit.parent?.owner ?? null;
+    if (block.styles && !styled.has(block.fn)) {
+      styled.add(block.fn);
+      ops.push({ op: 'styles', id: `Block-${block.id}-${classId(block.fn)}`, css: block.styles });
+    }
+    const slots: Record<string, unknown> = {};
+    for (const slotName of block.slots) {
+      const s = slot(() => {
+        const raw = unit.props.get()[slotName];
+        if (typeof raw === 'function') return (raw as () => Child)();
+        return (raw as Child) ?? null;
+      });
+      const def = slotDefinition(s)!;
+      def.name = `${block.id}.${slotName}`;
+      def.owner = unit.owner?.proxy;
+      slots[slotName] = s;
+    }
+    start(
+      unit,
+      [
+        () => {
+          const resolvedProps = resolveSettings(block.fields, unit.props.get());
+          return block.render.call(context, resolvedProps, slots);
+        }
+      ],
+      `block ${block.id}`
     );
   }
 

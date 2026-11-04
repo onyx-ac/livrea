@@ -1,0 +1,53 @@
+{
+  "name": "@livrea/ui",
+  "version": "0.1.0",
+  "description": "Livrea's low-footprint visual theme builder: <ThemeBuilder />, <ThemeCanvas />, <BlockTree />, <PatternPicker /> and <SettingsForm />.",
+  "license": "CC-BY-SA-4.0",
+  "author": {
+    "name": "Onyx AC, LLC",
+    "url": "https://onyx.ac"
+  },
+  "homepage": "https://onyx.ac",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/onyx-ac/livrea.git",
+    "directory": "packages/ui"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "LICENSE",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "pretest": "npm run build --workspace livrea"
+  },
+  "peerDependencies": {
+    "livrea": "0.1.0",
+    "react": ">=18"
+  },
+  "devDependencies": {
+    "@types/node": "^22.19.1",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "jsdom": "^29.0.2",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "typescript": "~5.8.3",
+    "vitest": "^4.1.12"
+  }
+}
+

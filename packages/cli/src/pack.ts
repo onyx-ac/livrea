@@ -69,7 +69,7 @@ export async function pack(folder: string, options: PackOptions = {}): Promise<P
   const theme = readThemeJson(dir);
   const entry = theme.entry ?? ['src/index.ts', 'src/index.tsx'].find((file) => existsSync(join(dir, file)));
   if (!entry || !existsSync(join(dir, entry))) throw new PackError(`No entry module: add src/index.ts, or name one as "entry" in theme.json.`);
-  const settingsFile = theme.settings ?? (existsSync(join(dir, 'src/settings.ts')) ? 'src/settings.ts' : undefined);
+  const settingsFile = theme.settings ?? ['src/settings.ts', 'src/settings.tsx'].find((file) => existsSync(join(dir, file)));
   const tsconfig = existsSync(join(dir, 'tsconfig.json')) ? join(dir, 'tsconfig.json') : undefined;
 
   if (options.check !== false && tsconfig) typeCheck(tsconfig);
@@ -168,6 +168,8 @@ async function readSettings(dir: string, file: string, tsconfig: string | undefi
     write: false,
     format: 'esm',
     platform: 'node',
+    jsx: 'automatic',
+    jsxImportSource: 'livrea',
     tsconfig,
     logLevel: 'silent'
   }).catch((error: { message: string }) => {
@@ -177,14 +179,69 @@ async function readSettings(dir: string, file: string, tsconfig: string | undefi
   try {
     const path = join(temporary, 'settings.mjs');
     writeFileSync(path, result.outputFiles[0]!.contents);
-    const loaded = (await import(pathToFileURL(path).href)) as { settings?: unknown };
+    const loaded = (await import(pathToFileURL(path).href)) as {
+      settings?: unknown;
+      blocks?: unknown;
+      patterns?: unknown;
+    };
     if (!loaded.settings || typeof loaded.settings !== 'object') {
       throw new PackError(`${file} needs to export its settings: export const settings = defineSettings({ … }).`);
     }
-    return { format: 1, fields: JSON.parse(JSON.stringify(loaded.settings)) as unknown };
+    const blocks = extractBlocks(loaded.blocks);
+    const patterns = extractPatterns(loaded.patterns);
+    return JSON.parse(
+      JSON.stringify({
+        format: 1,
+        fields: loaded.settings,
+        ...(blocks ? { blocks } : {}),
+        ...(patterns ? { patterns } : {})
+      })
+    ) as unknown;
   } finally {
     rmSync(temporary, { recursive: true, force: true });
   }
+}
+
+function extractBlocks(input: unknown): Record<string, unknown> | undefined {
+  if (!input || typeof input !== 'object') return undefined;
+  const out: Record<string, unknown> = {};
+  if (Array.isArray(input)) {
+    for (const item of input) {
+      if (item && (typeof item === 'object' || typeof item === 'function') && 'id' in item && 'schema' in item) {
+        out[String((item as { id: string }).id)] = (item as { schema: unknown }).schema;
+      }
+    }
+  } else {
+    for (const [key, item] of Object.entries(input as Record<string, unknown>)) {
+      if (item && (typeof item === 'object' || typeof item === 'function') && 'schema' in item) {
+        const id = 'id' in item && typeof item.id === 'string' ? item.id : key;
+        out[id] = (item as { schema: unknown }).schema;
+      } else if (item && typeof item === 'object') {
+        out[key] = item;
+      }
+    }
+  }
+  return Object.keys(out).length ? out : undefined;
+}
+
+function extractPatterns(input: unknown): Record<string, unknown> | undefined {
+  if (!input || typeof input !== 'object') return undefined;
+  const out: Record<string, unknown> = {};
+  if (Array.isArray(input)) {
+    for (const item of input) {
+      if (item && typeof item === 'object' && 'id' in item) {
+        out[String((item as { id: string }).id)] = item;
+      }
+    }
+  } else {
+    for (const [key, item] of Object.entries(input as Record<string, unknown>)) {
+      if (item && typeof item === 'object') {
+        const id = 'id' in item && typeof item.id === 'string' ? item.id : key;
+        out[id] = item;
+      }
+    }
+  }
+  return Object.keys(out).length ? out : undefined;
 }
 
 /** The theme's folder, as written: no installed modules, builds or packages. */

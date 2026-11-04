@@ -1,16 +1,17 @@
 {
   "name": "livrea-workspace",
   "private": true,
-  "description": "Livrea's workspace: the engine (livrea), its command-line tool (@livrea/cli) and its documentation site.",
+  "description": "Livrea's workspace: the engine (livrea), its command-line tool (@livrea/cli), its visual builder (@livrea/ui) and its documentation site.",
   "license": "CC-BY-SA-4.0",
   "workspaces": [
     "packages/livrea",
     "packages/cli",
+    "packages/ui",
     "packages/docs"
   ],
   "scripts": {
-    "build": "npm run build --workspace livrea && npm run build --workspace @livrea/cli",
-    "test": "npm run test --workspace livrea && npm run test --workspace @livrea/cli",
+    "build": "npm run build --workspace livrea && npm run build --workspace @livrea/cli && npm run build --workspace @livrea/ui",
+    "test": "npm run test --workspace livrea && npm run test --workspace @livrea/cli && npm run test --workspace @livrea/ui",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "docs": "npm run start --workspace @livrea/docs",
     "docs:build": "npm run build --workspace @livrea/docs"

@@ -121,6 +121,7 @@ export function serveRuntime(options: ServeOptions, scope: WorkerScope = globalT
               pages: source.pages,
               layout: source.layout,
               settings: source.settings,
+              blocks: source.blocks,
               events: message.events,
               state: message.state,
               page: message.page,
