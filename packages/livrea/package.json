@@ -13,7 +13,9 @@
     "url": "git+https://github.com/onyx-ac/livrea.git",
     "directory": "packages/livrea"
   },
-  "private": true,
+  "publishConfig": {
+    "access": "public"
+  },
   "type": "module",
   "sideEffects": false,
   "exports": {

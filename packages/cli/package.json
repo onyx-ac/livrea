@@ -13,7 +13,9 @@
     "url": "git+https://github.com/onyx-ac/livrea.git",
     "directory": "packages/cli"
   },
-  "private": true,
+  "publishConfig": {
+    "access": "public"
+  },
   "type": "module",
   "bin": {
     "livrea": "./dist/cli.js"

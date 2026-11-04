@@ -124,5 +124,6 @@ Themes from other authors run in a dedicated Worker: see [Running themes in a sa
 
 - [Writing themes](./writing-themes.md): page classes, slots, `select()`, `on()`, events and defaults.
 - [Settings](./settings.md): what the people running the app may change without code.
+- [Blocks, Patterns & Visual Builder](./blocks-and-patterns.md): combining TSX blocks with Gutenberg-style visual assembly at any depth.
 - [Packaging](./packaging.md): `livrea pack`, from a theme's folder to the package an app installs.
 - [Integrating an app](./apps.md) and [running themes in a sandbox](./sandbox.md).

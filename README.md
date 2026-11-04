@@ -31,7 +31,7 @@ npm run docs:build
 
 ## Releases
 
-`livrea` and `@livrea/cli` are published separately, at the same version. Creating the `@livrea` organisation on npm before the first public release reserves the scope for `@livrea/cli` and future tooling. Each package is ready once `"private": true` is removed from its `package.json`.
+`livrea` and `@livrea/cli` are published separately, at the same version. Creating the `@livrea` organisation on npm before the first public release reserves the scope for `@livrea/cli` and future tooling.
 
 ## Licence
 

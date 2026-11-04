@@ -9,12 +9,21 @@
  * base, and `state`, `data` and `listeners` merge along the class chain.
  */
 import type { ThemeEvent } from './events.js';
-import { jsx, type Child, type Node } from './jsx-runtime.js';
+import { Fragment, jsx, type Child, type Key, type Node } from './jsx-runtime.js';
 import type { Equals } from './reactive.js';
+import {
+  defineSettings,
+  type BlockNode,
+  type BlockSchema,
+  type LocalizedText,
+  type ScalarField,
+  type SettingsValues
+} from './settings.js';
 import { isRecord } from './store.js';
 import type { Cleanup, EventCatalog, EventName, ThemeSettings, ThemeStore } from './types.js';
 
 const SLOT = Symbol('livrea.slot');
+const BLOCK = Symbol('livrea.block');
 const SELECT = Symbol('livrea.select');
 const LISTENER = Symbol('livrea.listener');
 const HOST = Symbol('livrea.host');
