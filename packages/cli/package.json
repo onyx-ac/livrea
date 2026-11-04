@@ -1,0 +1,50 @@
+{
+  "name": "@livrea/cli",
+  "version": "0.1.0",
+  "description": "Livrea's command-line tool: `livrea pack` builds a theme into a package (.livrea) an app's admin can install.",
+  "license": "CC-BY-SA-4.0",
+  "author": {
+    "name": "Onyx AC, LLC",
+    "url": "https://onyx.ac"
+  },
+  "homepage": "https://onyx.ac",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/onyx-ac/livrea.git",
+    "directory": "packages/cli"
+  },
+  "private": true,
+  "type": "module",
+  "bin": {
+    "livrea": "./dist/cli.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "LICENSE",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "pretest": "npm run build --workspace livrea"
+  },
+  "dependencies": {
+    "esbuild": "^0.25.12",
+    "fflate": "^0.8.2",
+    "typescript": "~5.8.3"
+  },
+  "peerDependencies": {
+    "livrea": "0.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.19.1",
+    "vitest": "^4.1.12"
+  }
+}

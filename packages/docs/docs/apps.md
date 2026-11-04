@@ -1,3 +1,7 @@
+---
+title: Integrating an App
+---
+
 # Integrating Livrea into an App
 
 An application integrates Livrea by defining the contract and security boundary between its own trusted code and untrusted theme code.
@@ -135,7 +139,7 @@ export const { ThemeProvider, useTheme } = createThemeApp({
 3. **Privacy by opaque host components:**
    Events and store slices should carry states and IDs, never sensitive personal data, payment credentials, or raw user transcripts. When sensitive content must appear on screen (e.g. live voice captions or a checkout input), the app exposes an opaque `hostComponent` (`<Caption />`, `<PaymentTerminal />`): the theme controls where it sits in the layout without ever seeing the sensitive data inside it.
 4. **Same code in-thread or in-sandbox:**
-   When themes are written by third parties, the runtime runs inside a Web Worker with a Hardened JavaScript (SES) compartment with no network, storage, or DOM globals. When themes are written strictly in-house, `connectInThread` runs the exact same classes in the main thread with zero code changes.
+   When themes are written by third parties, the runtime runs in a dedicated Web Worker: no DOM, nothing of the app's to call, and the globals the app chooses taken away ([Running themes in a sandbox](./sandbox.md)). No hardening library is needed inside it, because the app trusts nothing the worker sends. When themes are written strictly in-house, `connectInThread` runs the exact same classes in the main thread with zero code changes.
 
 ---
 
@@ -161,26 +165,10 @@ runtime.receive({ kind: 'page', name: 'home' });
 runtime.receive({ kind: 'event', name: 'session:start', payload: {} });
 ```
 
-Tests can send `page`, `state`, `event`, and `invoke` messages and assert directly on the resulting `HostTree` and emitted `action` messages (see [`test/harness.ts`](../test/harness.ts)).
+Tests can send `page`, `state`, `event`, and `invoke` messages and assert directly on the resulting `HostTree` and emitted `action` messages (see [`test/harness.ts`](https://github.com/onyx-ac/livrea/blob/main/packages/livrea/test/harness.ts)).
 
 ---
 
-## Theme Package Structure (`.livrea`)
+## Theme Packages
 
-In production ecosystems, a theme is organised as a self-contained folder and compiled by `@livrea/cli pack` into a single verifiable `<id>-<version>.livrea` archive:
-
-```text
-my-theme/
-├── theme.json            id, name, version, engine version, optional parent theme, custom pages
-├── settings.ts           typed schema for no-code appearance settings (colours, fonts, toggles)
-├── layout.tsx            optional Layout subclass wrapping all pages
-├── pages/                one class per page; any omitted page uses the app's base class as-is
-│   ├── Home.tsx          extends HomePage
-│   └── Calendar.tsx      extends Component (a custom page added by the theme)
-├── components/           reusable Component classes with their own slots and listeners
-├── shared/               reusable selector functions and helpers
-├── assets/               fonts, images, theme.css
-└── locales/              translation JSON files
-```
-
-When packed into a `.livrea` bundle, the archive contains `source/`, pre-compiled `build/` modules with scoped CSS, and a `manifest.json` with SHA-256 file hashes and verified catalog event names—so your server can validate and store theme versions as plain data without ever compiling TSX in production.
+Themes reach an app as packages, `<id>-<version>.livrea`, built with `livrea pack`. The app's server checks and stores them as data, and its worker loads them with `importTheme()`, providing the modules the theme was built without: see [Packaging](./packaging.md).

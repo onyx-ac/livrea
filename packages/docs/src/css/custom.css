@@ -1,0 +1,21 @@
+/* Livrea's colours: a lacquered burgundy, as on a livery. */
+:root {
+  --ifm-color-primary: #8c2f39;
+  --ifm-color-primary-dark: #7e2a33;
+  --ifm-color-primary-darker: #772830;
+  --ifm-color-primary-darkest: #622128;
+  --ifm-color-primary-light: #9a343f;
+  --ifm-color-primary-lighter: #a13642;
+  --ifm-color-primary-lightest: #b63d4b;
+  --ifm-code-font-size: 95%;
+}
+
+[data-theme='dark'] {
+  --ifm-color-primary: #e08a93;
+  --ifm-color-primary-dark: #da727d;
+  --ifm-color-primary-darker: #d76672;
+  --ifm-color-primary-darkest: #c94351;
+  --ifm-color-primary-light: #e6a2a9;
+  --ifm-color-primary-lighter: #e9aeb4;
+  --ifm-color-primary-lightest: #f2d0d3;
+}

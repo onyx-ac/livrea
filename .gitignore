@@ -1,3 +1,7 @@
 node_modules/
 dist/
 *.tsbuildinfo
+
+# Docusaurus
+packages/docs/.docusaurus/
+packages/docs/build/

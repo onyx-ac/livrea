@@ -7,8 +7,40 @@
  *   import { serveRuntime } from 'livrea/worker';
  *   serveRuntime({ theme: async () => (await import('./my-theme')).THEME, block: { storage: true } });
  */
+import * as livrea from './index.js';
+import * as jsxRuntime from './jsx-runtime.js';
 import type { AppMessage, FromWorker, ToWorker } from './protocol.js';
 import { createRuntime, type Runtime, type RuntimeOptions, type ThemeSource } from './runtime.js';
+
+/**
+ * Where a theme packed with `livrea pack` (@livrea/cli) finds the modules it
+ * was built without: Livrea's own and the app's. The CLI turns each of their
+ * imports into a lookup here.
+ */
+export const SHARED_MODULES = '__livreaModules__';
+
+/**
+ * Loads a theme packed with `livrea pack` from `url` (the server's address of
+ * its build/theme.js, or a blob: URL of a cached copy). `modules` are the
+ * app's, by the names themes import them by, such as its base pages: the
+ * ones the package's theme.json lists as `shared`. Livrea's own modules are
+ * always this worker's, so the theme's classes run on the runtime's reactive
+ * core rather than a copy of it.
+ */
+export async function importTheme(url: string, modules: Readonly<Record<string, object>> = {}): Promise<ThemeSource> {
+  (globalThis as Record<string, unknown>)[SHARED_MODULES] = {
+    ...modules,
+    livrea,
+    'livrea/jsx-runtime': jsxRuntime,
+    'livrea/jsx-dev-runtime': jsxRuntime
+  };
+  const loaded = (await import(/* @vite-ignore */ url)) as { default?: unknown };
+  const theme = loaded.default as Partial<ThemeSource> | undefined;
+  if (!theme || typeof theme !== 'object' || !theme.pages || typeof theme.pages !== 'object') {
+    throw new Error("The theme's module has no default export with its pages: was it built with `livrea pack`?");
+  }
+  return theme as ThemeSource;
+}
 
 /** Which of the worker's globals themes don't get. Nothing is blocked by default: it's the app's policy. */
 export interface Blocked {
@@ -88,6 +120,7 @@ export function serveRuntime(options: ServeOptions, scope: WorkerScope = globalT
             runtime = createRuntime({
               pages: source.pages,
               layout: source.layout,
+              settings: source.settings,
               events: message.events,
               state: message.state,
               page: message.page,

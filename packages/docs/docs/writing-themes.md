@@ -1,3 +1,7 @@
+---
+title: Writing Themes
+---
+
 # Writing Themes
 
 Themes in Livrea are written as classes in TSX that extend the base page classes provided by the host application. An empty subclass renders the app's page as it is; a theme overrides only the regions and behaviours it wants to change.
@@ -182,3 +186,8 @@ class Child extends Parent {
   listeners = { second: on('mount', () => {}) };
 }
 ```
+
+## Settings
+
+What a theme lets the people running the app change without code, such as an accent colour or a welcome text, it declares as [settings](./settings.md), and reads as `this.settings`.
+

@@ -1,7 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { connectWorker, ThemeClient, type ThemeError, type WorkerLike } from '../src/host.js';
 import type { ThemeSource } from '../src/runtime.js';
-import { block, serveRuntime } from '../src/worker.js';
+import { block, importTheme, serveRuntime } from '../src/worker.js';
+import { Component } from '../src/index.js';
 import { HomePage } from './base.js';
 import { EVENTS, POLICY, STATE } from './harness.js';
 
@@ -236,3 +237,30 @@ describe('blocking globals', () => {
     expect(typeof new scope.Worker()).toBe('object');
   });
 });
+
+describe('themes packed with livrea pack', () => {
+  /** A module as the CLI builds it: Livrea and the app's modules are looked up, not bundled. */
+  const packed = (body: string) =>
+    `data:text/javascript,${encodeURIComponent(`const shared = globalThis.__livreaModules__;\n${body}`)}`;
+
+  it('run on this worker’s Livrea, with the modules the app provides', async () => {
+    const theme = await importTheme(
+      packed(`
+        const { Component } = shared['livrea'];
+        const { HomePage } = shared['@app/pages'];
+        class Home extends HomePage {}
+        class About extends Component {}
+        export default { pages: { home: Home, about: About } };
+      `),
+      { '@app/pages': { HomePage: class extends Component {} } }
+    );
+    expect(Object.keys(theme.pages)).toEqual(['home', 'about']);
+    // The very same Component class: one reactive core, the runtime's.
+    expect(theme.pages.about!.prototype).toBeInstanceOf(Component);
+  });
+
+  it('refuse a module that isn’t a theme', async () => {
+    await expect(importTheme(packed('export const nothing = 1;'))).rejects.toThrow('livrea pack');
+  });
+});
+

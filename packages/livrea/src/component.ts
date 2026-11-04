@@ -12,7 +12,7 @@ import type { ThemeEvent } from './events.js';
 import { jsx, type Child, type Node } from './jsx-runtime.js';
 import type { Equals } from './reactive.js';
 import { isRecord } from './store.js';
-import type { Cleanup, EventCatalog, EventName, ThemeStore } from './types.js';
+import type { Cleanup, EventCatalog, EventName, ThemeSettings, ThemeStore } from './types.js';
 
 const SLOT = Symbol('livrea.slot');
 const SELECT = Symbol('livrea.select');
@@ -177,6 +177,7 @@ export function Outlet(_props: {}): Node {
 /** What the runtime gives each component; theme code reaches it through the Component's methods. */
 export interface ComponentContext {
   readonly store: ThemeStore;
+  readonly settings: ThemeSettings;
   setState(component: Component, patch: object): void;
   raise(component: Component, name: string, payload: unknown): boolean;
   emit(component: Component, name: string, payload: unknown): void;
@@ -259,6 +260,11 @@ export class Component<P extends object = {}> {
   /** The app's state, read-only; every read is tracked. */
   get store(): ThemeStore {
     return this[CONTEXT].store;
+  }
+
+  /** The theme's settings as the app's admin set them, defaults filled in; every read is tracked. */
+  get settings(): ThemeSettings {
+    return this[CONTEXT].settings;
   }
 
   render(): Child {

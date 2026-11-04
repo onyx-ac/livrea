@@ -24,8 +24,9 @@ import { createEvent, LIFECYCLE_EVENTS, THEME_EVENT, type EventInfo } from './ev
 import type { Child, ComponentNode, Key, Node } from './jsx-runtime.js';
 import type { AppMessage, Out, OutProps, ThemeMessage, TreeOp } from './protocol.js';
 import { batch, Computed, effect, Signal, untrack, watch } from './reactive.js';
+import { resolveSetting, settingsCss, type SettingsSchema } from './settings.js';
 import { isRecord, Store } from './store.js';
-import type { Cleanup, EventName, ThemeStore } from './types.js';
+import type { Cleanup, EventName, ThemeSettings, ThemeStore } from './types.js';
 
 export type { EventInfo } from './events.js';
 export type { AppMessage, Out, OutProps, ThemeMessage, TreeOp } from './protocol.js';
@@ -48,12 +49,16 @@ export interface RuntimeOptions {
   helpers?: (view: any) => Record<string, unknown>;
   /** A page to show from the first render: a restarted theme comes back whole, in one message. */
   page?: PageShown | null;
+  /** The theme's settings (defineSettings), read from the store's `settings`. */
+  settings?: SettingsSchema;
 }
 
 /** A theme: its pages, by the names the app shows them by, and the frame around them. */
 export interface ThemeSource {
   readonly pages: Readonly<Record<string, ComponentClass>>;
   readonly layout?: ComponentClass;
+  /** What the app's admin may change without code (defineSettings). */
+  readonly settings?: SettingsSchema;
 }
 
 /** The page on screen, with its parameters. */
@@ -125,8 +130,27 @@ export function createRuntime(options: RuntimeOptions): Runtime {
   const report = (where: string, error: unknown) =>
     options.post({ kind: 'error', where, message: error instanceof Error ? error.message : String(error) });
 
+  const schema = options.settings ?? {};
+  // Each setting read through the tracked store, so what reads one renders again when the admin changes it.
+  const readSetting = (name: string | symbol): unknown => {
+    if (typeof name !== 'string' || !Object.hasOwn(schema, name)) return undefined;
+    const given = (store.view as { settings?: Record<string, unknown> }).settings;
+    return resolveSetting(schema[name]!, given?.[name]);
+  };
+  const settings: ThemeSettings = new Proxy({} as ThemeSettings, {
+    get: (_, name) => readSetting(name),
+    has: (_, name) => typeof name === 'string' && Object.hasOwn(schema, name),
+    ownKeys: () => Object.keys(schema),
+    getOwnPropertyDescriptor: (_, name): PropertyDescriptor | undefined =>
+      typeof name === 'string' && Object.hasOwn(schema, name) ? { value: readSetting(name), enumerable: true, configurable: true } : undefined,
+    set: () => {
+      throw new TypeError('Themes read their settings; the app sets them.');
+    }
+  });
+
   const context: ComponentContext = {
     store: store.view as ThemeStore,
+    settings,
     setState(component, patch) {
       const instance = instances.get(component);
       if (!instance) return;
@@ -575,8 +599,17 @@ export function createRuntime(options: RuntimeOptions): Runtime {
   }
 
   const root = createUnit(null, {});
+  let stopSettingsCss: (() => void) | undefined;
   process(() => {
     ops.push({ op: 'root', id: root.id });
+    // The colour and range settings as CSS variables, kept up to date.
+    if (Object.values(schema).some((definition) => definition.kind === 'color' || definition.kind === 'range')) {
+      stopSettingsCss = watch(
+        () => settingsCss(schema, settings as Readonly<Record<string, unknown>>),
+        (css) => void ops.push({ op: 'styles', id: 'livrea-settings', css }),
+        { immediate: true }
+      );
+    }
     if (options.layout) {
       const layout = createInstance(options.layout, root);
       root.owner = layout;
@@ -627,6 +660,7 @@ export function createRuntime(options: RuntimeOptions): Runtime {
       }
     },
     dispose() {
+      stopSettingsCss?.();
       process(() => {
         const current = page.peek();
         if (current) destroyInstance(current);
