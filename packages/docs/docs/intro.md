@@ -122,6 +122,7 @@ Themes from other authors run in a dedicated Worker: see [Running themes in a sa
 
 ## Where to Next
 
+- **[Interactive Visual Builder Playground](pathname:///livrea/demo/index.html)**: try `@livrea/ui` live in your browser, unpack patterns, edit blocks, and download a ready-to-pack `.zip` theme folder ([source in `packages/playground`](https://github.com/onyx-ac/livrea/tree/develop/packages/playground)).
 - [Writing themes](./writing-themes.md): page classes, slots, `select()`, `on()`, events and defaults.
 - [Settings](./settings.md): what the people running the app may change without code.
 - [Blocks, Patterns & Visual Builder](./blocks-and-patterns.md): combining TSX blocks with Gutenberg-style visual assembly at any depth.

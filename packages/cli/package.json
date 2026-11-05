@@ -2,6 +2,13 @@
   "name": "@livrea/cli",
   "version": "0.1.0",
   "description": "Livrea's command-line tool: `livrea pack` builds a theme into a package (.livrea) an app's admin can install.",
+  "keywords": [
+    "livrea",
+    "theme-engine",
+    "theme-bundler",
+    "theme-packager",
+    "cli"
+  ],
   "license": "CC-BY-SA-4.0",
   "author": {
     "name": "Onyx AC, LLC",

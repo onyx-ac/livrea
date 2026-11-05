@@ -186,7 +186,7 @@ export function createRuntime(options: RuntimeOptions): Runtime {
     emit(component, name, payload) {
       dispatch(name, payload, route(invoking ?? instances.get(component)?.unit ?? null, instances.get(component)));
     },
-    action: (name, args) => options.post({ kind: 'action', name, args: toPlain(args) as unknown[] }),
+    action: (name, ...args) => options.post({ kind: 'action', name, args: toPlain(args) as unknown[] }),
     track: (name) => options.post({ kind: 'track', name })
   };
 

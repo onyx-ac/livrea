@@ -140,6 +140,34 @@ export function moveBlockAtPath(tree: readonly BlockNode[], path: BlockPath, del
   return next;
 }
 
+/** Immutably moves the block at `fromIndex` to `toIndex` inside the slot at `slotPath`. */
+export function reorderBlockInSlot(
+  tree: readonly BlockNode[],
+  slotPath: BlockPath,
+  fromIndex: number,
+  toIndex: number
+): readonly BlockNode[] {
+  if (fromIndex === toIndex) return tree;
+  if (!slotPath.length) {
+    if (fromIndex < 0 || fromIndex >= tree.length || toIndex < 0 || toIndex >= tree.length) return tree;
+    const next = [...tree];
+    const [moved] = next.splice(fromIndex, 1);
+    next.splice(toIndex, 0, moved!);
+    return next;
+  }
+  const [head, slotName, ...tail] = slotPath;
+  if (typeof head !== 'number' || typeof slotName !== 'string' || head < 0 || head >= tree.length) return tree;
+  const current = tree[head]!;
+  const existing = current.slots?.[slotName] ?? [];
+  const nextChildren = reorderBlockInSlot(existing, tail, fromIndex, toIndex);
+  const next = [...tree];
+  next[head] = {
+    ...current,
+    slots: { ...(current.slots ?? {}), [slotName]: nextChildren }
+  };
+  return next;
+}
+
 /** Appends `nodesToInsert` into the slot at `slotPath` (`[]` for root, or `[index, slotName, ...]`). */
 export function insertBlocksAtSlotPath(
   tree: readonly BlockNode[],

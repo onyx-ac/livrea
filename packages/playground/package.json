@@ -1,0 +1,40 @@
+{
+  "name": "@livrea/playground",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Interactive playground and downloadable starter theme demonstrating livrea and @livrea/ui.",
+  "license": "CC-BY-SA-4.0",
+  "author": {
+    "name": "Onyx AC, LLC",
+    "url": "https://onyx.ac"
+  },
+  "type": "module",
+  "scripts": {
+    "start": "node scripts/build.mjs --serve",
+    "build": "node scripts/build.mjs",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "pretest": "npm run build --workspace livrea && npm run build --workspace @livrea/ui"
+  },
+  "dependencies": {
+    "@astryxdesign/core": "^0.7.8",
+    "@astryxdesign/theme-neutral": "^0.7.8",
+    "@livrea/ui": "0.1.0",
+    "@stylexjs/stylex": "^0.11.1",
+    "fflate": "^0.8.2",
+    "livrea": "0.1.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@astryxdesign/cli": "^0.7.8",
+    "@types/node": "^22.19.1",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "esbuild": "^0.25.12",
+    "jsdom": "^29.0.2",
+    "typescript": "~5.8.3",
+    "vitest": "^4.1.12"
+  }
+}
+

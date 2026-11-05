@@ -12,20 +12,24 @@ Themes are TypeScript classes that extend an app's base pages: an empty subclass
 |---|---|
 | [`livrea`](packages/livrea) | The engine: authoring themes, the runtime, the app's side, the worker sandbox, React bindings |
 | [`@livrea/cli`](packages/cli) | `livrea pack`: a theme's folder into the package an app's admin installs |
+| [`@livrea/ui`](packages/ui) | Low-footprint visual theme builder (`<ThemeBuilder />`, `<ThemeCanvas />`, `<BlockTree />`, `<PatternPicker />`, `<SettingsForm />`) |
+| [`@livrea/playground`](packages/playground) | Private interactive playground & downloadable starter theme (`npm run playground` or `/livrea/demo/` on the docs site) |
 | [`@livrea/docs`](packages/docs) | The documentation site (Docusaurus) |
 
-## Documentation
+## Documentation & Live Playground
 
-Start with the [introduction](packages/docs/docs/intro.md), or run the site locally with `npm run docs`.
+- Start with the [introduction](packages/docs/docs/intro.md) and [Blocks, Patterns & Visual Builder](packages/docs/docs/blocks-and-patterns.md).
+- Run the interactive visual builder playground locally with `npm run playground` (or open `/livrea/demo/` inside `npm run docs`) to edit blocks, unpack patterns, and download a ready-to-pack `.zip` theme folder.
 
 ## Development
 
 ```bash
 npm install          # the whole workspace; .npmrc sets legacy-peer-deps, for an npm 10 bug with Vitest 4
-npm run build        # livrea, then @livrea/cli
+npm run build        # livrea, @livrea/cli, @livrea/ui, and @livrea/playground
 npm test
 npm run typecheck
-npm run docs         # the documentation site, at http://localhost:3000/livrea/
+npm run playground   # the interactive @livrea/ui playground, at http://localhost:3001
+npm run docs         # the documentation site + /livrea/demo/, at http://localhost:3000/livrea/
 npm run docs:build
 ```
 

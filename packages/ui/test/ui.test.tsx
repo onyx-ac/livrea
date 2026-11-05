@@ -11,12 +11,26 @@ import {
   moveBlockAtPath,
   PatternPicker,
   removeBlockAtPath,
+  reorderBlockInSlot,
   SettingsForm,
   ThemeBuilder,
   updateBlockAtPath
 } from '../src/index.js';
 
 (globalThis as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true;
+
+if (typeof globalThis.CSS === 'undefined') {
+  (globalThis as Record<string, unknown>).CSS = {
+    escape: (s: string) => s
+  };
+} else if (!globalThis.CSS.escape) {
+  globalThis.CSS.escape = (s: string) => s;
+}
+
+if (typeof HTMLDialogElement !== 'undefined') {
+  HTMLDialogElement.prototype.showModal = HTMLDialogElement.prototype.showModal || function (this: HTMLDialogElement) { this.setAttribute('open', ''); };
+  HTMLDialogElement.prototype.close = HTMLDialogElement.prototype.close || function (this: HTMLDialogElement) { this.removeAttribute('open'); };
+}
 
 function mount(element: ReactNode) {
   const container = document.createElement('div');
@@ -127,6 +141,10 @@ describe('@livrea/ui tree operations', () => {
     const moved = moveBlockAtPath(withChild, [0, 'Right', 0, 'Body', 1], -1);
     expect(getBlockAtPath(moved, [0, 'Right', 0, 'Body', 0])?.props?.title).toBe('Desserts');
 
+    const reordered = reorderBlockInSlot(moved, [0, 'Right', 0, 'Body'], 0, 1);
+    expect(getBlockAtPath(reordered, [0, 'Right', 0, 'Body', 0])?.props?.title).toBe('Mains');
+    expect(getBlockAtPath(reordered, [0, 'Right', 0, 'Body', 1])?.props?.title).toBe('Desserts');
+
     const updated = updateBlockAtPath(moved, [0, 'Right', 0], (node) => ({
       ...node,
       props: { ...node.props, tone: 'glass' }
@@ -204,10 +222,43 @@ describe('<PatternPicker /> and <BlockTree />', () => {
       />
     );
 
+    // Sections with nested content are default collapsed; expand to reveal inner Card block.
+    const expandBtn = view.container.querySelector<HTMLButtonElement>('button[aria-label="Expand Split Columns"]');
+    if (expandBtn) act(() => expandBtn.click());
+
     // Select the inner Card block inside Right slot ([0, 'Right', 0]).
     const cardButton = Array.from(view.container.querySelectorAll('button')).find((b) => b.textContent === 'Card')!;
     act(() => cardButton.click());
     expect(selected).toEqual([0, 'Right', 0]);
+
+    // A single item in a slot has both Up and Down buttons disabled.
+    const moveCardUp = view.container.querySelector<HTMLButtonElement>('button[aria-label="Move Card up"]')!;
+    const moveCardDown = view.container.querySelector<HTMLButtonElement>('button[aria-label="Move Card down"]')!;
+    expect(moveCardUp.disabled || moveCardUp.getAttribute('aria-disabled') === 'true').toBe(true);
+    expect(moveCardDown.disabled || moveCardDown.getAttribute('aria-disabled') === 'true').toBe(true);
+
+    view.unmount();
+  });
+
+  it('disables up arrow on first item and down arrow on last item in a multi-block slot', () => {
+    const twoItemTree = cloneBlockTree(
+      [
+        { block: 'card' },
+        { block: 'daily-menu' }
+      ],
+      BLOCKS
+    );
+    const view = mount(<BlockTree tree={twoItemTree} blocks={BLOCKS} onChange={() => {}} />);
+
+    const firstUp = view.container.querySelector<HTMLButtonElement>('button[aria-label="Move Card up"]')!;
+    const firstDown = view.container.querySelector<HTMLButtonElement>('button[aria-label="Move Card down"]')!;
+    const lastUp = view.container.querySelector<HTMLButtonElement>('button[aria-label="Move Daily Menu up"]')!;
+    const lastDown = view.container.querySelector<HTMLButtonElement>('button[aria-label="Move Daily Menu down"]')!;
+
+    expect(firstUp.disabled || firstUp.getAttribute('aria-disabled') === 'true').toBe(true);
+    expect(firstDown.disabled || firstDown.getAttribute('aria-disabled') === 'true').toBe(false);
+    expect(lastUp.disabled || lastUp.getAttribute('aria-disabled') === 'true').toBe(false);
+    expect(lastDown.disabled || lastDown.getAttribute('aria-disabled') === 'true').toBe(true);
 
     view.unmount();
   });
@@ -242,6 +293,15 @@ describe('<ThemeBuilder />', () => {
       />
     );
 
+    const inspector = view.container.querySelector('[aria-label="Inspector"]')!;
+    // With no block selected, the inspector exclusively shows Theme Settings.
+    expect(inspector.textContent).toContain('Theme Settings');
+    expect(inspector.textContent).not.toContain('Block: Card');
+
+    // Expand the collapsed nested block.
+    const expandBtn = view.container.querySelector<HTMLButtonElement>('button[aria-label="Expand Split Columns"]');
+    if (expandBtn) act(() => expandBtn.click());
+
     // Click the nested Card block in the left outline.
     const cardButton = Array.from(view.container.querySelectorAll('button')).find((b) => b.textContent === 'Card')!;
     act(() => cardButton.click());
@@ -256,19 +316,32 @@ describe('<ThemeBuilder />', () => {
       />
     );
 
-    // The right-hand Inspector now shows "Block: Card" and its "Style" select input.
-    const inspector = view.container.querySelector('[aria-label="Block Inspector"]')!;
+    // The right-hand Inspector now exclusively shows "Block: Card" (hiding Theme Settings) and its "Style" select input.
     expect(inspector.textContent).toContain('Block: Card');
-    const styleSelect = inspector.querySelector<HTMLSelectElement>('select[aria-label="Style"]')!;
-    expect(styleSelect.value).toBe('gold');
+    expect(inspector.textContent).not.toContain('Show Clock');
+    expect(inspector.textContent).toContain('Style');
 
-    act(() => {
-      styleSelect.value = 'glass';
-      styleSelect.dispatchEvent(new Event('change', { bubbles: true }));
-    });
+    const combobox = inspector.querySelector<HTMLButtonElement>('button[role="combobox"]');
+    if (combobox) {
+      act(() => combobox.click());
+      const glassOption = Array.from(document.querySelectorAll('[role="option"]')).find((o) =>
+        o.textContent?.includes('Glass')
+      ) as HTMLElement | undefined;
+      if (glassOption) {
+        act(() => glassOption.click());
+      }
+    }
 
     const updatedTree = settingsValues.homeStage as typeof WELCOME_PATTERN.tree;
     expect(getBlockAtPath(updatedTree, [0, 'Right', 0])?.props?.tone).toBe('glass');
+
+    // Clicking "← Theme Settings" deselects the block and returns to Theme Settings.
+    const backBtn = Array.from(inspector.querySelectorAll('button')).find((b) =>
+      b.textContent?.includes('Theme Settings')
+    )!;
+    act(() => backBtn.click());
+    expect(inspector.textContent).toContain('Show Clock');
+    expect(inspector.textContent).not.toContain('Block: Card');
 
     view.unmount();
   });

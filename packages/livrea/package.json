@@ -1,7 +1,17 @@
 {
   "name": "livrea",
   "version": "0.1.0",
-  "description": "Livrea: themes for React apps, written as classes. Pages with overridable slots, tracked selectors, listeners and a typed event catalog, rendered from a sandbox.",
+  "description": "Livrea: themes for React apps, written as classes. Pages with overridable slots, tracked selectors, listeners and a typed event catalog, supports sandboxing.",
+  "keywords": [
+    "livrea",
+    "react",
+    "theming",
+    "theme-engine",
+    "theme-system",
+    "theme-runtime",
+    "sandboxed-ui",
+    "ui-extensibility"
+  ],
   "license": "CC-BY-SA-4.0",
   "author": {
     "name": "Onyx AC, LLC",

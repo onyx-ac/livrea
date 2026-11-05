@@ -342,7 +342,7 @@ export interface ComponentContext {
   setState(component: Component, patch: object): void;
   raise(component: Component, name: string, payload: unknown): boolean;
   emit(component: Component, name: string, payload: unknown): void;
-  action(name: string, args: unknown[]): void;
+  action(name: string, ...args: unknown[]): void;
   track(name: string): void;
 }
 
@@ -449,7 +449,7 @@ export class Component<P extends object = {}> {
 
   /** Asks the app to do something (navigate, ask…); the app decides whether it may. */
   action(name: string, ...args: unknown[]): void {
-    this[CONTEXT].action(name, args);
+    this[CONTEXT].action(name, ...args);
   }
 
   /** Counts an event in the app's usage figures. */

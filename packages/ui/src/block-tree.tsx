@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
+import { Button, CommandPalette, createStaticSource, Icon, IconButton } from '@astryxdesign/core';
 import type { BlockNode, BlockSchema, PatternDefinition } from 'livrea';
 import { PatternPicker } from './pattern-picker.js';
 import {
@@ -9,6 +10,7 @@ import {
   pathKey,
   pathsEqual,
   removeBlockAtPath,
+  reorderBlockInSlot,
   type BlockPath
 } from './tree-ops.js';
 
@@ -33,9 +35,15 @@ export interface BlockTreeProps {
   readonly locale?: string;
 }
 
+function isDescendant(parent: BlockPath, child: BlockPath | null | undefined): boolean {
+  if (!child || child.length <= parent.length) return false;
+  return parent.every((seg, i) => seg === child[i]);
+}
+
 /**
  * Gutenberg-style recursive tree editor for a `field.blocks()` slot.
  * Supports selecting blocks at any depth, reordering, deleting, and inserting blocks or patterns.
+ * Sections with nested content are collapsible and default to collapsed when added.
  */
 export function BlockTree({
   tree,
@@ -50,6 +58,22 @@ export function BlockTree({
 }: BlockTreeProps) {
   const allBlockIds = Object.keys(blocks);
   const rootAllowedIds = allowed?.length ? allowed.filter((id) => Object.hasOwn(blocks, id)) : allBlockIds;
+  const [dragging, setDragging] = useState<{ readonly slotKey: string; readonly index: number } | null>(null);
+  const [dragOver, setDragOver] = useState<{ readonly slotKey: string; readonly index: number } | null>(null);
+  const [expandedPaths, setExpandedPaths] = useState<ReadonlySet<string>>(() => new Set());
+
+  const toggleExpanded = (path: BlockPath) => {
+    const key = pathKey(path);
+    setExpandedPaths((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.add(key);
+      }
+      return next;
+    });
+  };
 
   const insertBlock = (slotPath: BlockPath, blockId: string) => {
     const node = createBlockNode(blockId, blocks);
@@ -57,6 +81,7 @@ export function BlockTree({
   };
 
   const renderSlotList = (nodes: readonly BlockNode[], slotPath: BlockPath, allowedIds: readonly string[]) => {
+    const currentSlotKey = pathKey(slotPath);
     return (
       <div className="livrea-ui-slot-list">
         {nodes.map((node, index) => {
@@ -64,58 +89,119 @@ export function BlockTree({
           const schema = blocks[node.block];
           const label = localize(schema?.label, locale, node.block);
           const isSelected = pathsEqual(selectedPath, currentPath);
+          const isDropTarget = dragOver?.slotKey === currentSlotKey && dragOver.index === index;
+          const hasNestedContent = Boolean(schema?.slots && schema.slots.length > 0);
+          const isExpanded = expandedPaths.has(pathKey(currentPath)) || isDescendant(currentPath, selectedPath);
+          const canReorder = nodes.length > 1;
 
           return (
             <div
               key={pathKey(currentPath)}
               className={`livrea-ui-tree-node${isSelected ? ' livrea-ui-tree-node-selected' : ''}`}
               data-block-path={pathKey(currentPath)}
+              draggable={canReorder}
+              onDragStart={(event) => {
+                if (!canReorder) return;
+                event.stopPropagation();
+                setDragging({ slotKey: currentSlotKey, index });
+                event.dataTransfer?.setData('text/plain', pathKey(currentPath));
+              }}
+              onDragOver={(event) => {
+                if (!canReorder || !dragging || dragging.slotKey !== currentSlotKey) return;
+                event.preventDefault();
+                event.stopPropagation();
+                setDragOver({ slotKey: currentSlotKey, index });
+              }}
+              onDrop={(event) => {
+                if (!canReorder || !dragging || dragging.slotKey !== currentSlotKey) return;
+                event.preventDefault();
+                event.stopPropagation();
+                if (dragging.index !== index) {
+                  onChange(reorderBlockInSlot(tree, slotPath, dragging.index, index));
+                }
+                setDragging(null);
+                setDragOver(null);
+              }}
+              onDragEnd={() => {
+                setDragging(null);
+                setDragOver(null);
+              }}
+              style={isDropTarget ? { outline: '2px dashed var(--livrea-ui-accent)' } : undefined}
             >
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
-                <button
-                  type="button"
-                  className={`livrea-ui-button${isSelected ? ' livrea-ui-button-active' : ''}`}
-                  style={{ flex: 1, textAlign: 'left' }}
-                  onClick={() => onSelect?.(currentPath)}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 4 }}>
+                <span
+                  aria-hidden="true"
+                  title={canReorder ? 'Drag to reorder' : 'Only one item'}
+                  style={{
+                    cursor: canReorder ? 'grab' : 'default',
+                    color: canReorder ? 'var(--livrea-ui-muted)' : 'var(--livrea-ui-border)',
+                    opacity: canReorder ? 1 : 0.35,
+                    userSelect: 'none',
+                    padding: '0 2px'
+                  }}
                 >
-                  {label}
-                </button>
-                <div style={{ display: 'flex', gap: 4 }}>
-                  <button
-                    type="button"
-                    className="livrea-ui-button"
-                    aria-label={`Move ${label} up`}
-                    disabled={index === 0}
-                    onClick={() => onChange(moveBlockAtPath(tree, currentPath, -1))}
-                  >
-                    ↑
-                  </button>
-                  <button
-                    type="button"
-                    className="livrea-ui-button"
-                    aria-label={`Move ${label} down`}
-                    disabled={index === nodes.length - 1}
-                    onClick={() => onChange(moveBlockAtPath(tree, currentPath, 1))}
-                  >
-                    ↓
-                  </button>
-                  <button
-                    type="button"
-                    className="livrea-ui-button"
-                    aria-label={`Remove ${label}`}
+                  ⋮⋮
+                </span>
+
+                {hasNestedContent ? (
+                  <IconButton
+                    label={isExpanded ? `Collapse ${label}` : `Expand ${label}`}
+                    icon={<Icon icon={isExpanded ? 'chevronLeft' : 'chevronRight'}/>}
+                    variant="ghost"
+                    size="sm"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      toggleExpanded(currentPath);
+                    }}
+                    type='button'
+                  />
+                ) : null}
+
+                <Button
+                  label={label}
+                  variant={isSelected ? 'primary' : 'ghost'}
+                  size="sm"
+                  width="100%"
+                  onClick={() => onSelect?.(currentPath)}
+                />
+
+                <div style={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+                  <IconButton
+                    label={`Move ${label} up`}
+                    icon={<Icon icon="arrowUp"/>}
+                    variant="ghost"
+                    size="sm"
+                    isDisabled={index === 0}
+                    onClick={() => {
+                      if (index > 0) onChange(moveBlockAtPath(tree, currentPath, -1));
+                    }}
+                  />
+                  <IconButton
+                    label={`Move ${label} down`}
+                    icon={<Icon icon="chevronDown"/>}
+                    variant="ghost"
+                    size="sm"
+                    isDisabled={index === nodes.length - 1}
+                    onClick={() => {
+                      if (index < nodes.length - 1) onChange(moveBlockAtPath(tree, currentPath, 1));
+                    }}
+                  />
+                  <IconButton
+                    label={`Remove ${label}`}
+                    icon={<Icon icon="close"/>}
+                    variant="ghost"
+                    size="sm"
                     onClick={() => {
                       if (isSelected) onSelect?.(null);
                       onChange(removeBlockAtPath(tree, currentPath));
                     }}
-                  >
-                    ×
-                  </button>
+                  />
                 </div>
               </div>
 
-              {schema?.slots?.length ? (
+              {hasNestedContent && isExpanded ? (
                 <div className="livrea-ui-tree-slots">
-                  {schema.slots.map((innerSlot) => {
+                  {schema!.slots!.map((innerSlot) => {
                     const innerSlotPath: BlockPath = [...currentPath, innerSlot];
                     const children = node.slots?.[innerSlot] ?? [];
                     return (
@@ -173,28 +259,38 @@ function SlotInserter({
   readonly locale: string;
   readonly onInsertBlock: (blockId: string) => void;
 }) {
-  const [selectedBlock, setSelectedBlock] = useState<string>(() => allowedIds[0] ?? '');
+  const [isPaletteOpen, setIsPaletteOpen] = useState(false);
   if (!allowedIds.length) return null;
-  const activeId = allowedIds.includes(selectedBlock) ? selectedBlock : allowedIds[0]!;
+
+  const items = useMemo(
+    () =>
+      allowedIds.map((id) => ({
+        id,
+        label: localize(blocks[id]?.label, locale, id)
+      })),
+    [allowedIds, blocks, locale]
+  );
+  const searchSource = useMemo(() => createStaticSource(items), [items]);
 
   return (
-    <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
-      <select
-        className="livrea-ui-select"
-        aria-label="Choose block to add"
-        style={{ flex: 1 }}
-        value={activeId}
-        onChange={(event) => setSelectedBlock(event.target.value)}
-      >
-        {allowedIds.map((id) => (
-          <option key={id} value={id}>
-            {localize(blocks[id]?.label, locale, id)}
-          </option>
-        ))}
-      </select>
-      <button type="button" className="livrea-ui-button" onClick={() => onInsertBlock(activeId)}>
-        + Add Block
-      </button>
+    <div style={{ marginTop: 6 }}>
+      <Button
+        label="+ Add Block…"
+        variant="secondary"
+        size="sm"
+        width="100%"
+        onClick={() => setIsPaletteOpen(true)}
+      />
+      <CommandPalette
+        isOpen={isPaletteOpen}
+        onOpenChange={setIsPaletteOpen}
+        searchSource={searchSource}
+        onValueChange={(blockId) => {
+          onInsertBlock(blockId);
+          setIsPaletteOpen(false);
+        }}
+        label="Add Block"
+      />
     </div>
   );
 }

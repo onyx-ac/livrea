@@ -19,6 +19,7 @@ export {
   pathKey,
   pathsEqual,
   removeBlockAtPath,
+  reorderBlockInSlot,
   updateBlockAtPath,
   type BlockPath
 } from './tree-ops.js';

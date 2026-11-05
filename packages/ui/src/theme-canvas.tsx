@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { Button, Selector } from '@astryxdesign/core';
+import { Resizable } from 're-resizable';
 import type { EventName } from 'livrea';
 import type { ThemeClient } from 'livrea/host';
 import { ThemeClientProvider, ThemePage, ThemeRoot, type HostComponents } from 'livrea/react';
@@ -17,6 +19,13 @@ const VIEWPORT_DIMENSIONS: Readonly<Record<CanvasViewport, { width: string; minH
   'kiosk-portrait': { width: '540px', minHeight: '960px' },
   mobile: { width: '375px', minHeight: '667px' }
 };
+
+const VIEWPORT_OPTIONS = [
+  { value: 'responsive', label: 'Responsive' },
+  { value: 'kiosk-landscape', label: 'Kiosk Landscape' },
+  { value: 'kiosk-portrait', label: 'Kiosk Portrait' },
+  { value: 'mobile', label: 'Mobile' }
+];
 
 export interface ThemeCanvasProps {
   /** Live `ThemeClient` running the theme preview. */
@@ -65,65 +74,77 @@ export function ThemeCanvas({
   return (
     <div className="livrea-ui-canvas" role="region" aria-label="Theme Preview Canvas">
       <div className="livrea-ui-canvas-toolbar">
-        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }} role="tablist" aria-label="Preview Pages">
-          {pages.map((pageName) => (
-            <button
-              key={pageName}
-              type="button"
-              role="tab"
-              aria-selected={currentPage === pageName}
-              className={`livrea-ui-button${currentPage === pageName ? ' livrea-ui-button-active' : ''}`}
-              onClick={() => selectPage(pageName)}
-            >
-              {pageName}
-            </button>
-          ))}
-        </div>
-
         <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
           {events.map((trigger) => (
-            <button
+            <Button
               key={trigger.name}
-              type="button"
-              className="livrea-ui-button"
+              label={`⚡ ${trigger.label ?? trigger.name}`}
+              variant="secondary"
+              size="sm"
               onClick={() => void client.emit(trigger.name as EventName, (trigger.payload ?? {}) as never)}
-            >
-              ⚡ {trigger.label ?? trigger.name}
-            </button>
+            />
           ))}
 
-          <select
-            className="livrea-ui-select"
-            aria-label="Viewport size"
+          <Selector
+            label="Viewport size"
+            isLabelHidden
+            options={VIEWPORT_OPTIONS}
             value={viewport}
-            onChange={(event) => setViewport(event.target.value as CanvasViewport)}
-          >
-            <option value="responsive">Responsive</option>
-            <option value="kiosk-landscape">Kiosk Landscape</option>
-            <option value="kiosk-portrait">Kiosk Portrait</option>
-            <option value="mobile">Mobile</option>
-          </select>
+            onChange={(val) => setViewport(val as CanvasViewport)}
+            size="sm"
+            width={140}
+          />
         </div>
       </div>
 
       <div className="livrea-ui-canvas-stage">
-        <div
-          className="livrea-ui-canvas-frame"
-          data-viewport={viewport}
-          style={{
-            width: dimensions.width,
-            minHeight: dimensions.minHeight,
-            border: '1px solid var(--livrea-ui-border)',
-            borderRadius: 'var(--livrea-ui-radius)',
-            overflow: 'hidden'
-          }}
-        >
-          <ThemeClientProvider client={client} components={components}>
-            <ThemeRoot>
-              <ThemePage page={currentPage} params={pageParams} />
-            </ThemeRoot>
-          </ThemeClientProvider>
-        </div>
+        {viewport === 'responsive' ? (
+          <Resizable
+            defaultSize={{ width: '100%', height: '100%' }}
+            minWidth={320}
+            minHeight={300}
+            enable={{
+              top: true,
+              right: true,
+              bottom: true,
+              left: true,
+              topRight: true,
+              bottomRight: true,
+              bottomLeft: true,
+              topLeft: true
+            }}
+            className="livrea-ui-canvas-frame livrea-ui-canvas-frame-resizable"
+            data-viewport={viewport}
+            style={{
+              border: '1px solid var(--livrea-ui-border)',
+              borderRadius: 'var(--livrea-ui-radius)',
+              position: 'relative'
+            }}
+          >
+            <ThemeClientProvider client={client} components={components}>
+              <ThemeRoot>
+                <ThemePage page={currentPage} params={pageParams} />
+              </ThemeRoot>
+            </ThemeClientProvider>
+          </Resizable>
+        ) : (
+          <div
+            className="livrea-ui-canvas-frame"
+            data-viewport={viewport}
+            style={{
+              width: dimensions.width,
+              minHeight: dimensions.minHeight,
+              border: '1px solid var(--livrea-ui-border)',
+              borderRadius: 'var(--livrea-ui-radius)'
+            }}
+          >
+            <ThemeClientProvider client={client} components={components}>
+              <ThemeRoot>
+                <ThemePage page={currentPage} params={pageParams} />
+              </ThemeRoot>
+            </ThemeClientProvider>
+          </div>
+        )}
       </div>
     </div>
   );

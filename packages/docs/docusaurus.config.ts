@@ -31,6 +31,7 @@ const config: Config = {
       title: 'Livrea',
       items: [
         { type: 'docSidebar', sidebarId: 'docs', position: 'left', label: 'Docs' },
+        { href: 'pathname:///livrea/demo/index.html', label: 'Playground', position: 'left' },
         { href: 'https://github.com/onyx-ac/livrea', label: 'GitHub', position: 'right' }
       ]
     },

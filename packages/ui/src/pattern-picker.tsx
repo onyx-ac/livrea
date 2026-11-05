@@ -1,3 +1,4 @@
+import { Button } from '@astryxdesign/core';
 import type { BlockNode, BlockSchema, PatternDefinition } from 'livrea';
 import { cloneBlockTree, localize } from './tree-ops.js';
 
@@ -40,15 +41,14 @@ export function PatternPicker({
         const label = localize(pattern.label, locale, pattern.id || key);
         return (
           <div key={key} role="listitem" style={{ marginBottom: 6 }}>
-            <button
-              type="button"
-              className="livrea-ui-button"
-              style={{ width: '100%', textAlign: 'left', display: 'flex', justifyContent: 'space-between' }}
+            <Button
+              label={label}
+              variant="secondary"
+              size="sm"
+              width="100%"
+              endContent={<span className="livrea-ui-help">{pattern.tree.length} block(s)</span>}
               onClick={() => onPick(cloneBlockTree(pattern.tree, blockSchemas), pattern)}
-            >
-              <span>{label}</span>
-              <span className="livrea-ui-help">{pattern.tree.length} block(s)</span>
-            </button>
+            />
           </div>
         );
       })}

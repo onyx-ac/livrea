@@ -1,3 +1,4 @@
+import { Button, Selector, Slider, Switch, TextArea, TextInput } from '@astryxdesign/core';
 import type { Field, LocalizedText, ScalarField } from 'livrea';
 import { localize } from './tree-ops.js';
 
@@ -21,7 +22,7 @@ export interface SettingsFormProps {
 
 /**
  * Renders the 7 scalar `field.*` input controls (`color`, `text`, `localizedText`,
- * `select`, `toggle`, `range`, `image`) from `settings.json`.
+ * `select`, `toggle`, `range`, `image`) from `settings.json` using Astryx components.
  */
 export function SettingsForm({
   fields,
@@ -54,19 +55,32 @@ export function SettingsForm({
             const colorValue = typeof raw === 'string' ? raw : definition.default;
             return (
               <div key={name} className="livrea-ui-field">
-                <label className="livrea-ui-label" htmlFor={`livrea-field-${name}`}>
-                  <span>{label}</span>
-                  <code>{colorValue}</code>
-                </label>
-                <input
-                  id={`livrea-field-${name}`}
-                  className="livrea-ui-input"
-                  type="color"
-                  aria-label={label}
-                  value={colorValue}
-                  onChange={(event) => setField(name, event.target.value)}
-                />
-                {help ? <span className="livrea-ui-help">{help}</span> : null}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <input
+                    id={`livrea-field-${name}`}
+                    type="color"
+                    aria-label={label}
+                    value={colorValue}
+                    onChange={(event) => setField(name, event.target.value)}
+                    style={{
+                      width: 28,
+                      height: 28,
+                      padding: 0,
+                      border: 'none',
+                      borderRadius: 4,
+                      cursor: 'pointer',
+                      background: 'transparent'
+                    }}
+                  />
+                  <TextInput
+                    label={label}
+                    description={help}
+                    value={colorValue}
+                    onChange={(val) => setField(name, val)}
+                    size="sm"
+                    width="100%"
+                  />
+                </div>
               </div>
             );
           }
@@ -75,30 +89,28 @@ export function SettingsForm({
             const textValue = typeof raw === 'string' ? raw : definition.default;
             return (
               <div key={name} className="livrea-ui-field">
-                <label className="livrea-ui-label" htmlFor={`livrea-field-${name}`}>
-                  {label}
-                </label>
                 {definition.multiline ? (
-                  <textarea
-                    id={`livrea-field-${name}`}
-                    className="livrea-ui-textarea"
-                    aria-label={label}
+                  <TextArea
+                    label={label}
+                    description={help}
                     maxLength={definition.maxLength}
                     value={textValue}
-                    onChange={(event) => setField(name, event.target.value)}
+                    onChange={(val) => setField(name, val)}
+                    size="sm"
+                    width="100%"
                   />
                 ) : (
-                  <input
-                    id={`livrea-field-${name}`}
-                    className="livrea-ui-input"
-                    type="text"
-                    aria-label={label}
-                    maxLength={definition.maxLength}
+                  <TextInput
+                    label={label}
+                    description={help}
                     value={textValue}
-                    onChange={(event) => setField(name, event.target.value)}
+                    onChange={(val) =>
+                      setField(name, definition.maxLength ? val.slice(0, definition.maxLength) : val)
+                    }
+                    size="sm"
+                    width="100%"
                   />
                 )}
-                {help ? <span className="livrea-ui-help">{help}</span> : null}
               </div>
             );
           }
@@ -112,24 +124,25 @@ export function SettingsForm({
               ? languages
               : Array.from(new Set([locale, ...Object.keys(definition.default), ...Object.keys(mapValue)]));
             return (
-              <fieldset key={name} className="livrea-ui-field">
+              <fieldset key={name} className="livrea-ui-field" style={{ border: 'none', padding: 0, margin: 0 }}>
                 <legend className="livrea-ui-label">{label}</legend>
-                {codes.map((code) => (
-                  <div key={code} className="livrea-ui-field">
-                    <label className="livrea-ui-help" htmlFor={`livrea-field-${name}-${code}`}>
-                      {code.toUpperCase()}
-                    </label>
-                    <input
-                      id={`livrea-field-${name}-${code}`}
-                      className="livrea-ui-input"
-                      type="text"
-                      aria-label={`${label} (${code})`}
-                      maxLength={definition.maxLength}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {codes.map((code) => (
+                    <TextInput
+                      key={code}
+                      label={`${label} (${code.toUpperCase()})`}
                       value={mapValue[code] ?? ''}
-                      onChange={(event) => setField(name, { ...mapValue, [code]: event.target.value })}
+                      onChange={(val) =>
+                        setField(name, {
+                          ...mapValue,
+                          [code]: definition.maxLength ? val.slice(0, definition.maxLength) : val
+                        })
+                      }
+                      size="sm"
+                      width="100%"
                     />
-                  </div>
-                ))}
+                  ))}
+                </div>
                 {help ? <span className="livrea-ui-help">{help}</span> : null}
               </fieldset>
             );
@@ -139,23 +152,18 @@ export function SettingsForm({
             const selected = typeof raw === 'string' ? raw : definition.default;
             return (
               <div key={name} className="livrea-ui-field">
-                <label className="livrea-ui-label" htmlFor={`livrea-field-${name}`}>
-                  {label}
-                </label>
-                <select
-                  id={`livrea-field-${name}`}
-                  className="livrea-ui-select"
-                  aria-label={label}
+                <Selector
+                  label={label}
+                  description={help}
+                  options={definition.options.map((option) => ({
+                    value: option.value,
+                    label: localize(option.label, locale, option.value)
+                  }))}
                   value={selected}
-                  onChange={(event) => setField(name, event.target.value)}
-                >
-                  {definition.options.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {localize(option.label, locale, option.value)}
-                    </option>
-                  ))}
-                </select>
-                {help ? <span className="livrea-ui-help">{help}</span> : null}
+                  onChange={(val) => setField(name, val)}
+                  size="sm"
+                  width="100%"
+                />
               </div>
             );
           }
@@ -164,17 +172,13 @@ export function SettingsForm({
             const checked = typeof raw === 'boolean' ? raw : definition.default;
             return (
               <div key={name} className="livrea-ui-field">
-                <label className="livrea-ui-label" htmlFor={`livrea-field-${name}`}>
-                  <span>{label}</span>
-                  <input
-                    id={`livrea-field-${name}`}
-                    type="checkbox"
-                    aria-label={label}
-                    checked={checked}
-                    onChange={(event) => setField(name, event.target.checked)}
-                  />
-                </label>
-                {help ? <span className="livrea-ui-help">{help}</span> : null}
+                <Switch
+                  label={label}
+                  description={help}
+                  value={checked}
+                  onChange={(val) => setField(name, val)}
+                  size="sm"
+                />
               </div>
             );
           }
@@ -183,24 +187,17 @@ export function SettingsForm({
             const numberValue = typeof raw === 'number' && Number.isFinite(raw) ? raw : definition.default;
             return (
               <div key={name} className="livrea-ui-field">
-                <label className="livrea-ui-label" htmlFor={`livrea-field-${name}`}>
-                  <span>{label}</span>
-                  <span>
-                    {numberValue}
-                    {definition.unit ?? ''}
-                  </span>
-                </label>
-                <input
-                  id={`livrea-field-${name}`}
-                  type="range"
-                  aria-label={label}
+                <Slider
+                  label={label}
+                  description={help ? `${help} (${numberValue}${definition.unit ?? ''})` : `${numberValue}${definition.unit ?? ''}`}
                   min={definition.min}
                   max={definition.max}
                   step={definition.step}
                   value={numberValue}
-                  onChange={(event) => setField(name, Number(event.target.value))}
+                  onChange={(val: number | [number, number]) => setField(name, typeof val === 'number' ? val : val[0])}
+                  valueDisplay="text"
+                  width="100%"
                 />
-                {help ? <span className="livrea-ui-help">{help}</span> : null}
               </div>
             );
           }
@@ -209,39 +206,36 @@ export function SettingsForm({
             const imageValue = typeof raw === 'string' ? raw : null;
             return (
               <div key={name} className="livrea-ui-field">
-                <label className="livrea-ui-label" htmlFor={`livrea-field-${name}`}>
-                  {label}
-                </label>
-                <div style={{ display: 'flex', gap: 6 }}>
-                  <input
-                    id={`livrea-field-${name}`}
-                    className="livrea-ui-input"
-                    style={{ flex: 1 }}
-                    type="text"
-                    aria-label={label}
-                    placeholder="https://…"
-                    value={imageValue ?? ''}
-                    onChange={(event) => setField(name, event.target.value || null)}
-                  />
+                <TextInput
+                  label={label}
+                  description={help}
+                  placeholder="https://…"
+                  value={imageValue ?? ''}
+                  onChange={(val) => setField(name, val || null)}
+                  size="sm"
+                  width="100%"
+                />
+                <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
                   {onPickImage ? (
-                    <button
-                      type="button"
-                      className="livrea-ui-button"
+                    <Button
+                      label="Browse"
+                      variant="secondary"
+                      size="sm"
                       onClick={async () => {
                         const picked = await onPickImage(imageValue, name);
                         if (picked !== undefined) setField(name, picked);
                       }}
-                    >
-                      Browse
-                    </button>
+                    />
                   ) : null}
                   {imageValue ? (
-                    <button type="button" className="livrea-ui-button" onClick={() => setField(name, null)}>
-                      Clear
-                    </button>
+                    <Button
+                      label="Clear"
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => setField(name, null)}
+                    />
                   ) : null}
                 </div>
-                {help ? <span className="livrea-ui-help">{help}</span> : null}
               </div>
             );
           }

@@ -2,6 +2,14 @@
   "name": "@livrea/ui",
   "version": "0.1.0",
   "description": "Livrea's low-footprint visual theme builder: <ThemeBuilder />, <ThemeCanvas />, <BlockTree />, <PatternPicker /> and <SettingsForm />.",
+  "keywords": [
+    "livrea",
+    "react",
+    "theme-builder",
+    "theme-editor",
+    "visual-theme-builder",
+    "theme-customizer"
+  ],
   "license": "CC-BY-SA-4.0",
   "author": {
     "name": "Onyx AC, LLC",
@@ -36,10 +44,13 @@
     "pretest": "npm run build --workspace livrea"
   },
   "peerDependencies": {
+    "@astryxdesign/core": "^0.7.8",
     "livrea": "0.1.0",
     "react": ">=18"
   },
   "devDependencies": {
+    "@astryxdesign/core": "^0.7.8",
+    "@astryxdesign/theme-neutral": "^0.7.8",
     "@types/node": "^22.19.1",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
@@ -48,6 +59,8 @@
     "react-dom": "^19.0.0",
     "typescript": "~5.8.3",
     "vitest": "^4.1.12"
+  },
+  "dependencies": {
+    "re-resizable": "^6.11.2"
   }
 }
-

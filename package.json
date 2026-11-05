@@ -1,19 +1,22 @@
 {
   "name": "livrea-workspace",
   "private": true,
-  "description": "Livrea's workspace: the engine (livrea), its command-line tool (@livrea/cli), its visual builder (@livrea/ui) and its documentation site.",
+  "description": "Livrea's workspace: the engine (livrea), its command-line tool (@livrea/cli), its visual builder (@livrea/ui), its interactive playground (@livrea/playground) and its documentation site.",
   "license": "CC-BY-SA-4.0",
   "workspaces": [
     "packages/livrea",
     "packages/cli",
     "packages/ui",
+    "packages/playground",
     "packages/docs"
   ],
   "scripts": {
-    "build": "npm run build --workspace livrea && npm run build --workspace @livrea/cli && npm run build --workspace @livrea/ui",
-    "test": "npm run test --workspace livrea && npm run test --workspace @livrea/cli && npm run test --workspace @livrea/ui",
+    "build": "npm run build --workspace livrea && npm run build --workspace @livrea/cli && npm run build --workspace @livrea/ui && npm run build --workspace @livrea/playground",
+    "test": "npm run test --workspace livrea && npm run test --workspace @livrea/cli && npm run test --workspace @livrea/ui && npm run test --workspace @livrea/playground",
     "typecheck": "npm run typecheck --workspaces --if-present",
-    "docs": "npm run start --workspace @livrea/docs",
-    "docs:build": "npm run build --workspace @livrea/docs"
+    "playground": "npm run start --workspace @livrea/playground",
+    "playground:build": "npm run build --workspace @livrea/playground",
+    "docs": "npm run playground:build && npm run start --workspace @livrea/docs",
+    "docs:build": "npm run playground:build && npm run build --workspace @livrea/docs"
   }
 }
