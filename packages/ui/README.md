@@ -23,3 +23,11 @@ import { ThemeBuilder } from '@livrea/ui';
 - `<PatternPicker />` — Visual gallery of `patterns` from `settings.json` filtered by target slot, unpacking into a mutable `BlockNode[]` tree.
 - `<SettingsForm />` — Renders inputs for the 7 scalar `field.*` kinds (`color`, `text`, `localizedText`, `select`, `toggle`, `range`, `image`).
 
+## Astryx UI Components & Planned Ejection
+
+`@livrea/ui` currently utilizes components from Meta's `@astryxdesign/core` (including `Button`, `CommandPalette`, `Selector`, `TextInput`, `TextArea`, `Switch`, `Slider`, `Kbd`) to provide an accessible, high-fidelity visual builder UX.
+
+> [!NOTE]
+> **Planned Ejection**: An ejection of the used Astryx component primitives directly into the `@livrea/ui` source tree is planned once the overall design and UX are finalized. This will emit and integrate the component source directly into the package, eliminating the external `@astryxdesign/core` dependency and maintaining Livrea's commitment to a self-contained, low-footprint UI layer.
+
+

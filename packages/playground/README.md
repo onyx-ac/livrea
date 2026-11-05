@@ -1,4 +1,4 @@
-# `@livrea/demo`
+# `@livrea/playground`
 
 Interactive browser playground for [`livrea`](../livrea) and [`@livrea/ui`](../ui).
 
@@ -10,11 +10,20 @@ It runs a complete website sample theme (**Meridian Studio** — editorial artic
 - **Upload a starting theme** (`.livrea` package, `.zip` theme archive, or `settings.json` schema) to test customizability schemas and presets.
 - **Download Theme (.zip)** to export a complete, ready-to-pack theme folder (`theme.json`, `settings.json`, `preset-settings.json`, `src/index.tsx`, `src/settings.ts`).
 
+## Astryx UI Integration & Planned Component Ejection
+
+The playground and builder currently leverage `@astryxdesign/core` and `@astryxdesign/theme-neutral` for their controls, shell layout, and interactive dialogs.
+
+> [!NOTE]
+> **Planned Ejection**: An ejection of the required Astryx components directly into the codebase (integrating the source primitives directly into `@livrea/ui` and `@livrea/playground`) is planned once the overall UX is approved, removing the external library dependency while preserving the accessible design system.
+
 ## Running Locally
 
 From the workspace root:
 
 ```bash
-npm run demo         # starts the interactive playground at http://localhost:3001
-npm run demo:build   # builds the static playground into packages/demo/dist and packages/docs/static/demo
+npm run playground         # starts the interactive playground at http://localhost:3001
+npm run playground:build   # builds the static playground into packages/playground/dist and packages/docs/static/demo
+# or via the `demo` alias:
+npm run demo
 ```
