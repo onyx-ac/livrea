@@ -11,7 +11,9 @@
   "type": "module",
   "scripts": {
     "start": "node scripts/build.mjs --serve",
+    "prebuild": "npm run build --workspace livrea && npm run build --workspace @livrea/ui",
     "build": "node scripts/build.mjs",
+    "prebuild:pages": "npm run build --workspace livrea && npm run build --workspace @livrea/ui",
     "build:pages": "node scripts/build.mjs --pages",
     "pretypecheck": "npm run build --workspace livrea && npm run build --workspace @livrea/ui",
     "typecheck": "tsc -p tsconfig.json",
