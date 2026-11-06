@@ -39,6 +39,7 @@
   ],
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
+    "pretypecheck": "npm run build --workspace livrea",
     "typecheck": "tsc -p tsconfig.json",
     "test": "vitest run",
     "pretest": "npm run build --workspace livrea"
