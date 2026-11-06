@@ -5,4 +5,3 @@ dist/
 # Docusaurus
 packages/docs/.docusaurus/
 packages/docs/build/
-packages/docs/static/demo/

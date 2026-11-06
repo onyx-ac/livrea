@@ -5,7 +5,8 @@ import { build, context } from 'esbuild';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const distDir = join(root, 'dist');
-const docsStaticDemoDir = resolve(root, '../docs/static/demo');
+const repoRoot = resolve(root, '../..');
+const repoPlaygroundDir = join(repoRoot, 'playground');
 
 const HTML = `<!doctype html>
 <html lang="en">
@@ -46,19 +47,34 @@ const options = {
 mkdirSync(distDir, { recursive: true });
 writeFileSync(join(distDir, 'index.html'), HTML);
 
-if (process.argv.includes('--serve')) {
+const isServe = process.argv.includes('--serve');
+const shouldEmitPages = process.argv.includes('--pages');
+
+if (isServe) {
   const ctx = await context(options);
   await ctx.watch();
   const { port } = await ctx.serve({ servedir: distDir, port: 3007 });
   console.log(`Livrea interactive demo running at http://localhost:${port}`);
 } else {
   await build(options);
-  mkdirSync(docsStaticDemoDir, { recursive: true });
-  writeFileSync(join(docsStaticDemoDir, 'index.html'), HTML);
-  copyFileSync(join(distDir, 'demo.js'), join(docsStaticDemoDir, 'demo.js'));
-  if (existsSync(join(distDir, 'demo.css'))) {
-    copyFileSync(join(distDir, 'demo.css'), join(docsStaticDemoDir, 'demo.css'));
+
+  // Only emit to repository root playground/ folder when --pages flag is passed
+  if (shouldEmitPages) {
+    mkdirSync(repoPlaygroundDir, { recursive: true });
+    writeFileSync(join(repoPlaygroundDir, 'index.html'), HTML);
+    copyFileSync(join(distDir, 'demo.js'), join(repoPlaygroundDir, 'demo.js'));
+    if (existsSync(join(distDir, 'demo.css'))) {
+      copyFileSync(join(distDir, 'demo.css'), join(repoPlaygroundDir, 'demo.css'));
+    }
+    if (existsSync(join(distDir, 'demo.js.map'))) {
+      copyFileSync(join(distDir, 'demo.js.map'), join(repoPlaygroundDir, 'demo.js.map'));
+    }
+    if (existsSync(join(distDir, 'demo.css.map'))) {
+      copyFileSync(join(distDir, 'demo.css.map'), join(repoPlaygroundDir, 'demo.css.map'));
+    }
+    console.log('Built @livrea/playground to dist/ and playground/ (root)');
+  } else {
+    console.log('Built @livrea/playground to dist/ (pass --pages to emit to root playground/)');
   }
-  console.log('Built @livrea/playground to dist/ and packages/docs/static/demo/');
 }
 

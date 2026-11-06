@@ -344,10 +344,6 @@ export function DemoApp() {
           onPageChange={setActivePage}
           locale={language}
           languages={['en', 'it']}
-          events={[
-            { name: 'article:publish', label: 'Publish Article', payload: { title: 'Composable UI Blocks at Scale' } },
-            { name: 'contact:submitted', label: 'Simulate Contact Reply', payload: { email: 'team@meridian.dev' } }
-          ]}
         />
       </Stack>
     </Theme>

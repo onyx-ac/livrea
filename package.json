@@ -16,7 +16,8 @@
     "typecheck": "npm run typecheck --workspaces --if-present",
     "playground": "npm run start --workspace @livrea/playground",
     "playground:build": "npm run build --workspace @livrea/playground",
-    "docs": "npm run playground:build && npm run start --workspace @livrea/docs",
-    "docs:build": "npm run playground:build && npm run build --workspace @livrea/docs"
+    "playground:pages": "npm run build:pages --workspace @livrea/playground",
+    "docs": "npm run start --workspace @livrea/docs",
+    "docs:build": "npm run build --workspace @livrea/docs"
   }
 }

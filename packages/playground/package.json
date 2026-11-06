@@ -12,6 +12,7 @@
   "scripts": {
     "start": "node scripts/build.mjs --serve",
     "build": "node scripts/build.mjs",
+    "build:pages": "node scripts/build.mjs --pages",
     "typecheck": "tsc -p tsconfig.json",
     "test": "vitest run",
     "pretest": "npm run build --workspace livrea && npm run build --workspace @livrea/ui"

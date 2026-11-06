@@ -280,7 +280,7 @@ This architecture establishes a continuous customisation spectrum where each tie
 ## `@livrea/ui`: Drop-in Visual Builder for Apps
 
 :::tip Try It Live
-Open the **[Interactive Visual Builder Playground](pathname:///livrea/demo/index.html)** ([source in `packages/playground`](https://github.com/onyx-ac/livrea/tree/develop/packages/playground)) to rearrange blocks, unpack patterns, trigger catalog events, and download a ready-to-pack `.zip` theme archive with your customizations.
+Open the **[Interactive Visual Builder Playground](pathname:///livrea/playground/index.html)** ([source in `packages/playground`](https://github.com/onyx-ac/livrea/tree/develop/packages/playground)) to rearrange blocks, unpack patterns, trigger catalog events, and download a ready-to-pack `.zip` theme archive with your customizations.
 :::
 
 Rather than every app team building their own `settings.json` form renderer and Gutenberg-style canvas editor from scratch, **`@livrea/ui`** provides a ready-to-embed visual builder with a minimal dependency footprint (`livrea` and `react` as peer dependencies, zero external UI framework bloat).

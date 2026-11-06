@@ -121,7 +121,7 @@ export function ThemeCanvas({
           {events.map((trigger) => (
             <Button
               key={trigger.name}
-              label={`⚡ ${trigger.label ?? trigger.name}`}
+              label={trigger.label ?? trigger.name}
               variant="secondary"
               size="sm"
               onClick={() => void client.emit(trigger.name as EventName, (trigger.payload ?? {}) as never)}
