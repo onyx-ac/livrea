@@ -4,6 +4,8 @@ export {
   Component,
   css,
   defineBlock,
+  EDIT_BLOCK_HOST,
+  EDIT_SLOT_HOST,
   hostComponent,
   Layout,
   on,
@@ -26,6 +28,22 @@ export {
   type State
 } from './component.js';
 export { structuralEqual, shallowEqual } from './equality.js';
+export {
+  checkThemeData,
+  dataField,
+  defineData,
+  withSampleData,
+  type DataCheck,
+  type DataField,
+  type DataItem,
+  type DataList,
+  type DataRecord,
+  type DataSchema,
+  type DataShape,
+  type DataType,
+  type DataValue,
+  type DataValues
+} from './data.js';
 export type { Defaults, EventInfo, ThemeEvent } from './events.js';
 export type { Child, Key, Node } from './jsx-runtime.js';
 export {

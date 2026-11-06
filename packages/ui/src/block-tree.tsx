@@ -7,6 +7,8 @@ import {
   insertBlocksAtSlotPath,
   localize,
   moveBlockAtPath,
+  pathAfterMove,
+  pathAfterRemoval,
   pathKey,
   pathsEqual,
   removeBlockAtPath,
@@ -80,6 +82,11 @@ export function BlockTree({
     onChange(insertBlocksAtSlotPath(tree, slotPath, [node]));
   };
 
+  /** A selection stays on its block when blocks move around it. */
+  const followMove = (from: BlockPath, toSlot: BlockPath, gap: number) => {
+    if (selectedPath) onSelect?.(pathAfterMove(selectedPath, from, toSlot, gap));
+  };
+
   const renderSlotList = (nodes: readonly BlockNode[], slotPath: BlockPath, allowedIds: readonly string[]) => {
     const currentSlotKey = pathKey(slotPath);
     return (
@@ -118,6 +125,7 @@ export function BlockTree({
                 event.stopPropagation();
                 if (dragging.index !== index) {
                   onChange(reorderBlockInSlot(tree, slotPath, dragging.index, index));
+                  followMove([...slotPath, dragging.index], slotPath, index > dragging.index ? index + 1 : index);
                 }
                 setDragging(null);
                 setDragOver(null);
@@ -173,7 +181,10 @@ export function BlockTree({
                     size="sm"
                     isDisabled={index === 0}
                     onClick={() => {
-                      if (index > 0) onChange(moveBlockAtPath(tree, currentPath, -1));
+                      if (index > 0) {
+                        onChange(moveBlockAtPath(tree, currentPath, -1));
+                        followMove(currentPath, slotPath, index - 1);
+                      }
                     }}
                   />
                   <IconButton
@@ -183,7 +194,10 @@ export function BlockTree({
                     size="sm"
                     isDisabled={index === nodes.length - 1}
                     onClick={() => {
-                      if (index < nodes.length - 1) onChange(moveBlockAtPath(tree, currentPath, 1));
+                      if (index < nodes.length - 1) {
+                        onChange(moveBlockAtPath(tree, currentPath, 1));
+                        followMove(currentPath, slotPath, index + 2);
+                      }
                     }}
                   />
                   <IconButton
@@ -192,7 +206,7 @@ export function BlockTree({
                     variant="ghost"
                     size="sm"
                     onClick={() => {
-                      if (isSelected) onSelect?.(null);
+                      if (selectedPath) onSelect?.(pathAfterRemoval(selectedPath, currentPath));
                       onChange(removeBlockAtPath(tree, currentPath));
                     }}
                   />
@@ -260,7 +274,6 @@ function SlotInserter({
   readonly onInsertBlock: (blockId: string) => void;
 }) {
   const [isPaletteOpen, setIsPaletteOpen] = useState(false);
-  if (!allowedIds.length) return null;
 
   const items = useMemo(
     () =>
@@ -271,6 +284,7 @@ function SlotInserter({
     [allowedIds, blocks, locale]
   );
   const searchSource = useMemo(() => createStaticSource(items), [items]);
+  if (!allowedIds.length) return null;
 
   return (
     <div style={{ marginTop: 6 }}>

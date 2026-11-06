@@ -55,7 +55,8 @@ export async function parseUploadedTheme(
         id: fileName.replace(/\.json$/i, ''),
         name: fileName.replace(/\.json$/i, ''),
         version: '1.0.0',
-        schema: parsed,
+        // The theme running is still the current one, and reads the data it always did.
+        schema: { ...parsed, data: parsed.data ?? currentSchema.data },
         values: defaultValuesFromSchema(parsed)
       };
     }
@@ -125,6 +126,8 @@ export async function parseUploadedTheme(
     themeSource = await importTheme(dataUrl);
   }
 
+  // Without a theme of its own, the archive only changes the settings of the one running.
+  if (!themeSource) schema = { ...schema, data: schema.data ?? currentSchema.data };
   return { id, name, version, schema, values, themeSource };
 }
 

@@ -183,6 +183,7 @@ async function readSettings(dir: string, file: string, tsconfig: string | undefi
       settings?: unknown;
       blocks?: unknown;
       patterns?: unknown;
+      data?: unknown;
     };
     if (!loaded.settings || typeof loaded.settings !== 'object') {
       throw new PackError(`${file} needs to export its settings: export const settings = defineSettings({ … }).`);
@@ -194,7 +195,8 @@ async function readSettings(dir: string, file: string, tsconfig: string | undefi
         format: 1,
         fields: loaded.settings,
         ...(blocks ? { blocks } : {}),
-        ...(patterns ? { patterns } : {})
+        ...(patterns ? { patterns } : {}),
+        ...(loaded.data && typeof loaded.data === 'object' && Object.keys(loaded.data).length ? { data: loaded.data } : {})
       })
     ) as unknown;
   } finally {

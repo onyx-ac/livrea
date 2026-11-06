@@ -184,10 +184,38 @@ export function blockDefinition(value: unknown): InternalBlockDefinition | undef
   return typeof value === 'function' ? (value as unknown as { [BLOCK]?: InternalBlockDefinition })[BLOCK] : undefined;
 }
 
-/** Renders a list of BlockNodes into JSX using the available block definitions. */
+/** Where a list of blocks sits, while a builder edits them: its `field.blocks()` setting, and the path within it. */
+export interface BlockListAddress {
+  readonly setting: string;
+  readonly path: readonly (string | number)[];
+}
+
+/** A slot's blocks inside the marker a builder finds it by, even when it has none. */
+function editableSlot(
+  nodes: readonly BlockNode[],
+  catalog: ReadonlyMap<string, BlockDefinition<any, any>>,
+  address: BlockListAddress,
+  fallback?: Child,
+  siblings = 0
+): Node {
+  return jsx(EditSlot, {
+    setting: address.setting,
+    path: address.path,
+    count: nodes.length,
+    // How many blocks its block's other slots hold: a builder may make less of an empty slot beside filled ones.
+    siblings: siblings || undefined,
+    children: nodes.length ? renderBlocks(nodes, catalog, address) : fallback
+  });
+}
+
+/**
+ * Renders a list of BlockNodes into JSX using the available block definitions.
+ * With an `address`, each block and inner slot carries a marker for a builder's visual editing (`createRuntime`'s `editing`).
+ */
 export function renderBlocks(
   nodes: readonly BlockNode[] | undefined,
-  catalog: ReadonlyMap<string, BlockDefinition<any, any>> = registeredBlocks
+  catalog: ReadonlyMap<string, BlockDefinition<any, any>> = registeredBlocks,
+  address?: BlockListAddress
 ): Node {
   if (!nodes || !nodes.length) return jsx(Fragment, {});
   const children: Node[] = [];
@@ -196,6 +224,20 @@ export function renderBlocks(
     const Block = catalog.get(node.block) ?? registeredBlocks.get(node.block);
     if (!Block) continue;
     const props: Record<string, unknown> = { ...(node.props ?? {}) };
+    if (address) {
+      const path = [...address.path, i];
+      const slotNames = Block.schema.slots ?? [];
+      const held = (name: string) => node.slots?.[name]?.length ?? 0;
+      const total = slotNames.reduce((sum, name) => sum + held(name), 0);
+      for (const slotName of slotNames) {
+        const inner = { setting: address.setting, path: [...path, slotName] };
+        props[slotName] = () => editableSlot(node.slots?.[slotName] ?? [], catalog, inner, undefined, total - held(slotName));
+      }
+      children.push(
+        jsx(EditBlock, { setting: address.setting, path, block: node.block, children: jsx(Block, props, `${node.block}-${i}`) }, `${node.block}-${i}`)
+      );
+      continue;
+    }
     if (node.slots) {
       for (const [slotName, slotChildren] of Object.entries(node.slots)) {
         if (Array.isArray(slotChildren) && slotChildren.length) {
@@ -220,8 +262,11 @@ export function blockSlot<P extends object = {}>(
   const s: Slot<P> = slot<P>((props): Child => {
     const owner = definition?.owner;
     const nodes = owner ? ((owner.settings as Record<string, unknown>)[settingName] as readonly BlockNode[] | undefined) : undefined;
+    const catalog = owner?.[CONTEXT]?.blocks ?? registeredBlocks;
+    if (owner?.[CONTEXT]?.editing) {
+      return editableSlot(Array.isArray(nodes) ? nodes : [], catalog, { setting: settingName, path: [] }, fallback?.(props));
+    }
     if (Array.isArray(nodes) && nodes.length > 0) {
-      const catalog = owner?.[CONTEXT]?.blocks ?? registeredBlocks;
       return renderBlocks(nodes, catalog);
     }
     return fallback ? fallback(props) : null;
@@ -314,6 +359,10 @@ export function listenerDefinition(value: unknown): ListenerDefinition | undefin
 /** A part only the app can run (the avatar, a button, a video): themes place it, the app renders it. */
 export type HostComponent<P extends object = {}> = ((props: P) => Node) & { readonly hostName: string };
 
+// The markers of visual editing: app components only a builder provides (@livrea/ui). Never rendered otherwise.
+export const EDIT_BLOCK_HOST = 'LivreaEditBlock';
+export const EDIT_SLOT_HOST = 'LivreaEditSlot';
+
 export function hostComponent<P extends object = {}>(name: string): HostComponent<P> {
   const placeholder = function hostPlaceholder(): never {
     throw new Error(`${name} is rendered by the app.`);
@@ -339,6 +388,8 @@ export interface ComponentContext {
   readonly store: ThemeStore;
   readonly settings: ThemeSettings;
   readonly blocks?: ReadonlyMap<string, BlockDefinition<any, any>>;
+  /** A builder is editing the blocks: they render with markers it finds them by. */
+  readonly editing?: boolean;
   setState(component: Component, patch: object): void;
   raise(component: Component, name: string, payload: unknown): boolean;
   emit(component: Component, name: string, payload: unknown): void;
@@ -473,3 +524,6 @@ export function isComponentClass(value: unknown): value is new () => Component<a
 export function css(strings: TemplateStringsArray, ...values: unknown[]): string {
   return String.raw({ raw: strings }, ...values);
 }
+
+const EditBlock = hostComponent<{ setting: string; path: readonly (string | number)[]; block: string; children?: Child }>(EDIT_BLOCK_HOST);
+const EditSlot = hostComponent<{ setting: string; path: readonly (string | number)[]; count: number; siblings?: number; children?: Child }>(EDIT_SLOT_HOST);

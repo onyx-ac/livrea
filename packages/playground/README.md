@@ -7,6 +7,8 @@ It runs a complete website sample theme (**Meridian Studio** — editorial artic
 - Interact with host components like `ContactForm` (`contact-block`) and `ActionButton` across multiple pages (`home`, `articles`, `contact`).
 - Rearrange **Blocks** inside **Slots** (`homeStage`, `articlesStage`, `contactStage`) and nested container slots (`Left`, `Right`, `Header`, `Body`, `Footer`).
 - Unpack starter **Patterns** (`EditorialSplitPattern`, `AgencyLandingPattern`, `MagazineIndexPattern`, `SplitContactPattern`) and customize their nested blocks at any depth.
+- **Edit on the preview**: click, drag between slots, add to empty slots and remove blocks directly on the canvas, or switch it to **Preview** to use the page. Undo and redo cover all of it.
+- See **what data the theme reads** in the Inspector's Data section. Articles and services are its samples (`DEMO_DATA` in `src/theme.tsx`), passed through `withSampleData`: nothing is fetched.
 - **Upload a starting theme** (`.livrea` package, `.zip` theme archive, or `settings.json` schema) to test customizability schemas and presets.
 - **Download Theme (.zip)** to export a complete, ready-to-pack theme folder (`theme.json`, `settings.json`, `preset-settings.json`, `src/index.tsx`, `src/settings.ts`).
 

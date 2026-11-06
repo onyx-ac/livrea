@@ -13,8 +13,8 @@ import {
   Theme
 } from '@astryxdesign/core';
 import { neutralTheme } from '@astryxdesign/theme-neutral/built';
-import { ThemeBuilder, cloneBlockTree } from '@livrea/ui';
-import type { EventName, SettingsJson } from 'livrea';
+import { EDITOR_HOST_NAMES, ThemeBuilder, cloneBlockTree } from '@livrea/ui';
+import { withSampleData, type EventName, type SettingsJson } from 'livrea';
 import { SAFE_TAGS, ThemeClient } from 'livrea/host';
 import { connectInThread, hostNames, read, type HostComponentProps, type HostComponents } from 'livrea/react';
 import type { ThemeSource } from 'livrea/runtime';
@@ -184,11 +184,11 @@ export function DemoApp() {
 
   const client = useMemo(() => {
     const instance = new ThemeClient({
-      connect: connectInThread({ theme: themeSource, events: DEMO_EVENTS }),
-      state: { ...INITIAL_STORE_STATE, language, currentPage: activePage, settings: values },
+      connect: connectInThread({ theme: themeSource, events: DEMO_EVENTS, editing: true }),
+      state: withSampleData(schema.data, { ...INITIAL_STORE_STATE, language, currentPage: activePage, settings: values }),
       policy: {
         tags: SAFE_TAGS,
-        hosts: hostNames(PREVIEW_COMPONENTS),
+        hosts: new Set([...hostNames(PREVIEW_COMPONENTS), ...EDITOR_HOST_NAMES]),
         url: () => true
       },
       events: DEMO_EVENTS,
@@ -196,7 +196,6 @@ export function DemoApp() {
         const rawTarget = Array.isArray(args[0]) ? args[0][0] : args[0];
         if (name === 'navigate' && typeof rawTarget === 'string') {
           setActivePage(rawTarget);
-          instance.patch({ currentPage: rawTarget } as never);
           instance.showPage(rawTarget);
         }
         if (name === 'submitContact') {
@@ -210,13 +209,15 @@ export function DemoApp() {
   }, [themeSource]);
 
   useEffect(() => {
-    client.setState({
-      ...INITIAL_STORE_STATE,
-      language,
-      currentPage: activePage,
-      settings: values
-    });
-  }, [client, language, activePage, values]);
+    client.setState(
+      withSampleData(schema.data, {
+        ...INITIAL_STORE_STATE,
+        language,
+        currentPage: activePage,
+        settings: values
+      })
+    );
+  }, [client, schema, language, activePage, values]);
 
   const handleUploadFile = async (file: File) => {
     setUploadError(null);

@@ -15,6 +15,8 @@
  * or doesn't fit its field reads as the default.
  */
 
+import type { DataSchema } from './data.js';
+
 /** Text in each of the app's languages, by the codes the app uses ("en", "IT"…). */
 export type LocalizedText = Readonly<Record<string, string>>;
 
@@ -276,6 +278,8 @@ export interface SettingsJson {
   readonly fields: SettingsSchema;
   readonly blocks?: Readonly<Record<string, BlockSchema>>;
   readonly patterns?: Readonly<Record<string, PatternDefinition>>;
+  /** What the theme reads from the store (defineData): for an app's checks and a builder's preview. */
+  readonly data?: DataSchema;
 }
 
 export interface SettingsJsonOptions {
@@ -283,6 +287,8 @@ export interface SettingsJsonOptions {
     | Readonly<Record<string, BlockSchema | { readonly id?: string; readonly schema: BlockSchema }>>
     | readonly { readonly id: string; readonly schema: BlockSchema }[];
   readonly patterns?: Readonly<Record<string, PatternDefinition>> | readonly PatternDefinition[];
+  /** What the theme reads from the store (defineData). */
+  readonly data?: DataSchema;
 }
 
 export function normalizeBlockSchemas(
@@ -329,7 +335,8 @@ export function settingsJson(schema: SettingsSchema, options: SettingsJsonOption
     format: SETTINGS_FORMAT,
     fields: schema,
     ...(blocks ? { blocks } : {}),
-    ...(patterns ? { patterns } : {})
+    ...(patterns ? { patterns } : {}),
+    ...(options.data && Object.keys(options.data).length ? { data: options.data } : {})
   };
 }
 

@@ -331,6 +331,8 @@ export interface ThemeConnection {
 
 /** What a runtime starts from, for the app's side of a connection; the worker sandbox runs its own copy of the theme. */
 export interface RuntimeSetup {
+  /** A builder is editing the theme's blocks: they render with markers for its visual editing. */
+  readonly editing?: boolean;
   readonly theme: ThemeSource;
   readonly events: Readonly<Record<string, EventInfo>>;
 }

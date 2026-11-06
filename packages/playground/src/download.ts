@@ -37,7 +37,8 @@ export function buildThemeZipBytes(
     format: schema.format ?? 1,
     fields: updatedFields as SettingsJson['fields'],
     ...(schema.blocks ? { blocks: schema.blocks } : {}),
-    ...(schema.patterns ? { patterns: schema.patterns } : {})
+    ...(schema.patterns ? { patterns: schema.patterns } : {}),
+    ...(schema.data ? { data: schema.data } : {})
   };
 
   const siteName =
@@ -111,7 +112,9 @@ export function buildThemeZipBytes(
     }
   });
 
-  const settingsTs = `import { definePattern, defineSettings, field } from 'livrea';
+  const settingsTs = `import { defineData, definePattern, defineSettings, field } from 'livrea';
+
+export const data = defineData(${JSON.stringify(schema.data ?? {}, null, 2)});
 
 export const blocks = ${JSON.stringify(schema.blocks ?? {}, null, 2)} as const;
 

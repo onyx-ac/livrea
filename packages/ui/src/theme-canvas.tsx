@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Button, Selector } from '@astryxdesign/core';
 import { Resizable } from 're-resizable';
 import type { EventName } from 'livrea';
 import type { ThemeClient } from 'livrea/host';
 import { ThemeClientProvider, ThemePage, ThemeRoot, type HostComponents } from 'livrea/react';
+import { EDITOR_COMPONENTS, VisualEditor, type VisualEditorProps } from './visual-editor.js';
 
 export interface ThemeCanvasEventTrigger {
   readonly name: string;
@@ -19,6 +20,11 @@ const VIEWPORT_DIMENSIONS: Readonly<Record<CanvasViewport, { width: string; minH
   'kiosk-portrait': { width: '540px', minHeight: '960px' },
   mobile: { width: '375px', minHeight: '667px' }
 };
+
+const MODE_OPTIONS = [
+  { value: 'edit', label: 'Edit' },
+  { value: 'preview', label: 'Preview' }
+];
 
 const VIEWPORT_OPTIONS = [
   { value: 'responsive', label: 'Responsive' },
@@ -44,6 +50,10 @@ export interface ThemeCanvasProps {
   readonly events?: readonly ThemeCanvasEventTrigger[];
   /** Initial viewport preset; `'responsive'` by default. */
   readonly viewport?: CanvasViewport;
+  /** Controls of the app's beside the canvas's own, at the start of its toolbar. */
+  readonly toolbar?: ReactNode;
+  /** Selecting, moving and removing blocks on the preview itself; it needs a runtime started with `editing`. */
+  readonly editor?: VisualEditorProps;
 }
 
 /**
@@ -58,7 +68,9 @@ export function ThemeCanvas({
   onPageChange,
   pageParams,
   events = [],
-  viewport: initialViewport = 'responsive'
+  viewport: initialViewport = 'responsive',
+  toolbar,
+  editor
 }: ThemeCanvasProps) {
   const [internalPage, setInternalPage] = useState<string>(() => pages[0] ?? 'home');
   const [viewport, setViewport] = useState<CanvasViewport>(initialViewport);
@@ -71,10 +83,41 @@ export function ThemeCanvas({
 
   const dimensions = VIEWPORT_DIMENSIONS[viewport];
 
+  const [mode, setMode] = useState<'edit' | 'preview'>('edit');
+  const [hasMarkers, setHasMarkers] = useState(false);
+  const themeRef = useRef<HTMLDivElement | null>(null);
+
+  // A runtime that isn't `editing` has nothing to edit: the preview stays a plain, interactive one.
+  useEffect(() => {
+    const theme = themeRef.current;
+    if (!theme || !editor) return;
+    const check = () => setHasMarkers(theme.querySelector('[data-livrea-slot]') !== null);
+    check();
+    const observer = new MutationObserver(check);
+    observer.observe(theme, { childList: true, subtree: true });
+    return () => observer.disconnect();
+  }, [editor !== undefined, viewport === 'responsive']);
+
+  const isEditing = editor !== undefined && hasMarkers && mode === 'edit';
+  const allComponents = editor ? { ...components, ...EDITOR_COMPONENTS } : components;
+  const preview = (
+    <div className="livrea-ui-canvas-content" data-mode={isEditing ? 'edit' : 'preview'}>
+      <div ref={themeRef}>
+        <ThemeClientProvider client={client} components={allComponents}>
+          <ThemeRoot>
+            <ThemePage page={currentPage} params={pageParams} />
+          </ThemeRoot>
+        </ThemeClientProvider>
+      </div>
+      {isEditing ? <VisualEditor {...editor} themeRef={themeRef} /> : null}
+    </div>
+  );
+
   return (
     <div className="livrea-ui-canvas" role="region" aria-label="Theme Preview Canvas">
       <div className="livrea-ui-canvas-toolbar">
         <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+          {toolbar}
           {events.map((trigger) => (
             <Button
               key={trigger.name}
@@ -84,6 +127,18 @@ export function ThemeCanvas({
               onClick={() => void client.emit(trigger.name as EventName, (trigger.payload ?? {}) as never)}
             />
           ))}
+
+          {editor && hasMarkers ? (
+            <Selector
+              label="Canvas mode"
+              isLabelHidden
+              options={MODE_OPTIONS}
+              value={mode}
+              onChange={(val) => setMode(val as 'edit' | 'preview')}
+              size="sm"
+              width={110}
+            />
+          ) : null}
 
           <Selector
             label="Viewport size"
@@ -121,11 +176,7 @@ export function ThemeCanvas({
               position: 'relative'
             }}
           >
-            <ThemeClientProvider client={client} components={components}>
-              <ThemeRoot>
-                <ThemePage page={currentPage} params={pageParams} />
-              </ThemeRoot>
-            </ThemeClientProvider>
+            {preview}
           </Resizable>
         ) : (
           <div
@@ -138,11 +189,7 @@ export function ThemeCanvas({
               borderRadius: 'var(--livrea-ui-radius)'
             }}
           >
-            <ThemeClientProvider client={client} components={components}>
-              <ThemeRoot>
-                <ThemePage page={currentPage} params={pageParams} />
-              </ThemeRoot>
-            </ThemeClientProvider>
+            {preview}
           </div>
         )}
       </div>

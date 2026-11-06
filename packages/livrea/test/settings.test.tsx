@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import {
   blockSlot,
+  checkThemeData,
+  dataField,
+  defineData,
+  withSampleData,
   Component,
+  EDIT_BLOCK_HOST,
+  EDIT_SLOT_HOST,
   defineBlock,
   definePattern,
   defineSettings,
@@ -9,6 +15,7 @@ import {
   resolveSettings,
   settingsJson
 } from '../src/index.js';
+import { createRuntime } from '../src/runtime.js';
 import { run, STATE } from './harness.js';
 import { SETTINGS } from './settings.js';
 
@@ -194,5 +201,172 @@ describe('settings', () => {
     expect(app.view()).toBe(
       '<div><article class="card-gold"><span class="badge">VIP</span><span class="badge">Open</span></article><article class="card-gold"><span class="badge">Direct</span></article></div>'
     );
+  });
+});
+
+describe('blocks while a builder edits them', () => {
+  const Card = defineBlock({
+    id: 'marker-card',
+    label: { en: 'Card' },
+    slots: ['Body'],
+    render(_props, slots) {
+      return (
+        <section>
+          <slots.Body />
+        </section>
+      );
+    }
+  });
+  const Text = defineBlock({ id: 'marker-text', label: { en: 'Text' }, render: () => <p>text</p> });
+  const Columns = defineBlock({
+    id: 'marker-columns',
+    label: { en: 'Columns' },
+    slots: ['Left', 'Right'],
+    render(_props, slots) {
+      return (
+        <div>
+          <slots.Left />
+          <slots.Right />
+        </div>
+      );
+    }
+  });
+  const settings = defineSettings({ stage: field.blocks({ label: { en: 'Stage' }, default: [] }) });
+  class Page extends Component {
+    Stage = blockSlot('stage', () => <p>fallback</p>);
+    render() {
+      return (
+        <main>
+          <this.Stage />
+        </main>
+      );
+    }
+  }
+  const STAGE = [
+    { block: 'marker-text' },
+    { block: 'marker-card', slots: { Body: [{ block: 'marker-text' }] } },
+    { block: 'marker-card' },
+    { block: 'marker-columns', slots: { Left: [{ block: 'marker-text' }] } }
+  ];
+  const render = (editing: boolean | undefined, stage: unknown) => {
+    const ops: unknown[] = [];
+    const runtime = createRuntime({
+      pages: { page: Page },
+      settings,
+      blocks: [Card, Text, Columns],
+      editing,
+      state: { settings: { stage } },
+      post: (message) => {
+        if (message.kind === 'tree') ops.push(...message.ops);
+      }
+    });
+    runtime.receive({ kind: 'page', name: 'page' });
+    return JSON.stringify(ops);
+  };
+  const markers = (json: string, name: string) =>
+    [...json.matchAll(new RegExp(`"name":"${name}","props":(\\{.*?\\}),"c"`, 'g'))].map((m) => JSON.parse(m[1]!));
+
+  it('carry no markers otherwise', () => {
+    expect(render(undefined, STAGE)).not.toContain('LivreaEdit');
+    expect(render(false, STAGE)).not.toContain('LivreaEdit');
+  });
+
+  it('say where each block and slot is, nested, by its place in the list', () => {
+    const json = render(true, STAGE);
+    expect(markers(json, EDIT_BLOCK_HOST).map((m) => m.path)).toEqual(expect.arrayContaining([[0], [1], [2], [1, 'Body', 0]]));
+    const slots = markers(json, EDIT_SLOT_HOST);
+    expect(slots).toEqual(
+      expect.arrayContaining([
+        { setting: 'stage', path: [], count: 4 },
+        { setting: 'stage', path: [1, 'Body'], count: 1 },
+        { setting: 'stage', path: [2, 'Body'], count: 0 },
+        // Beside a filled slot, an empty one says so; alone in an empty block, it doesn't.
+        { setting: 'stage', path: [3, 'Left'], count: 1 },
+        { setting: 'stage', path: [3, 'Right'], count: 0, siblings: 1 }
+      ])
+    );
+  });
+
+  it('mark an empty stage too, around what the theme shows instead', () => {
+    const json = render(true, []);
+    expect(markers(json, EDIT_SLOT_HOST)).toEqual([{ setting: 'stage', path: [], count: 0 }]);
+    expect(json).toContain('fallback');
+  });
+});
+
+describe('the data a theme reads', () => {
+  const data = defineData({
+    articles: dataField.list({
+      label: { en: 'Articles' },
+      item: { id: 'string', title: 'string', minutes: 'number?' },
+      sample: [{ id: 'a', title: 'Hello' }]
+    }),
+    hotel: dataField.record({ label: { en: 'Hotel' }, fields: { name: 'string' }, sample: { name: 'Grand View' } }),
+    tagline: dataField.value({ label: { en: 'Tagline' }, type: 'string', sample: 'Welcome' })
+  });
+
+  it('is plain data, in settings.json', () => {
+    const json = JSON.parse(JSON.stringify(settingsJson(SETTINGS, { data })));
+    expect(json.data.articles.item.minutes).toBe('number?');
+    expect(json.data.tagline.sample).toBe('Welcome');
+    expect('data' in settingsJson(SETTINGS)).toBe(false);
+  });
+
+  it.each([
+    ['a sample missing a value', { x: dataField.list({ label: { en: 'X' }, item: { id: 'string' }, sample: [{}] as never }) }, 'its sample[0].id is missing'],
+    ['a sample of the wrong type', { x: dataField.value({ label: { en: 'X' }, type: 'number', sample: 'one' as never }) }, 'should be a number'],
+    ['a list that is not one', { x: dataField.list({ label: { en: 'X' }, item: {}, sample: {} as never }) }, 'should be a list'],
+    ['no label', { x: dataField.value({ label: {}, type: 'string', sample: 'a' }) }, 'needs a label'],
+    ['a bad name', { 'no spaces': dataField.value({ label: { en: 'X' }, type: 'string', sample: 'a' }) }, 'needs a name'],
+    ['the store\'s own settings', { settings: dataField.value({ label: { en: 'X' }, type: 'string', sample: 'a' }) }, 'needs a name'],
+    ['a huge sample', { x: dataField.value({ label: { en: 'X' }, type: 'string', sample: 'a'.repeat(300 * 1024) }) }, 'over 256 KB']
+  ])('refuses %s as the theme is defined', (_, schema, message) => {
+    expect(() => defineData(schema as never)).toThrow(message);
+  });
+
+  it('takes nested data as `any`, checking only that it is there', () => {
+    const nested = defineData({ content: dataField.record({ label: { en: 'Content' }, fields: { rooms: 'any', extra: 'any?' }, sample: { rooms: [{ beds: 2 }] } }) });
+    expect(checkThemeData(nested, { content: { rooms: [] } })[0]?.status).toBe('provided');
+    expect(checkThemeData(nested, { content: {} })[0]?.problem).toBe('content.rooms is missing.');
+  });
+
+  it('reports what an app provides, lacks, or has in the wrong shape', () => {
+    const checks = checkThemeData(data, { articles: [{ id: 'a', title: 'x' }, { id: 'b', title: 3 }], hotel: { name: 'H' } });
+    expect(checks).toEqual([
+      { name: 'articles', status: 'invalid', problem: 'articles[1].title should be a string, and is a number.' },
+      { name: 'hotel', status: 'provided' },
+      { name: 'tagline', status: 'missing' }
+    ]);
+    expect(checkThemeData(undefined, {})).toEqual([]);
+    expect(checkThemeData(data, { articles: [], hotel: { name: 'H' }, tagline: 'x' }).every((c) => c.status === 'provided')).toBe(true);
+  });
+
+  it('fills previews with samples, keeping what the app has', () => {
+    const state = withSampleData(data, { tagline: 'Ours', language: 'en', settings: {} });
+    expect(state.tagline).toBe('Ours');
+    expect(state.articles).toEqual([{ id: 'a', title: 'Hello' }]);
+    expect(state.language).toBe('en');
+  });
+
+  it("can't reach the rest of the state from an uploaded settings.json", () => {
+    const uploaded = JSON.parse('{"settings":{"kind":"value","sample":"x"},"__proto__":{"kind":"value","sample":"y"},"constructor":{"kind":"value","sample":"z"},"unknown":{"kind":"later","sample":1}}');
+    const state = withSampleData(uploaded, { settings: { real: true } }) as Record<string, unknown>;
+    expect(state.settings).toEqual({ real: true });
+    expect(({} as Record<string, unknown>).kind).toBeUndefined();
+    expect(state.unknown).toBe(1);
+    expect(checkThemeData(uploaded, { unknown: 'anything' }).find((c) => c.name === 'unknown')?.status).toBe('provided');
+  });
+
+  it('never reaches a running theme by itself', () => {
+    const seen: unknown[] = [];
+    class Page extends Component {
+      render() {
+        seen.push((this.store as unknown as { articles?: unknown }).articles);
+        return <p>page</p>;
+      }
+    }
+    const runtime = createRuntime({ pages: { page: Page }, state: {}, post: () => {} });
+    runtime.receive({ kind: 'page', name: 'page' });
+    expect(seen).toEqual([undefined]);
   });
 });

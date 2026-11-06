@@ -13,6 +13,8 @@ import {
   Outlet,
   select,
   settingsJson,
+  dataField,
+  defineData,
   slot,
   type EventInfo
 } from 'livrea';
@@ -537,10 +539,6 @@ export const demoSettings = defineSettings({
   })
 });
 
-export const DEMO_SETTINGS_JSON = settingsJson(demoSettings, {
-  blocks: DEMO_BLOCKS,
-  patterns: DEMO_PATTERNS
-});
 
 // --- Theme Layout & Pages ---
 
@@ -833,70 +831,101 @@ export const DEMO_THEME: ThemeSource = {
   blocks: DEMO_BLOCKS
 };
 
-export const INITIAL_STORE_STATE: DemoStoreState = {
-  language: 'en',
-  currentPage: 'home',
-  siteTagline: 'Digital Product & Architecture Journal',
-  articles: [
-    {
-      id: 'a1',
-      title: 'Why Sandboxed Class Inheritance Beats Static Templates',
-      excerpt: 'How object-oriented slots and path-tracked selectors let customers customize workflows without forking your app.',
-      category: 'engineering',
-      readingTimeMinutes: 7,
-      featured: true,
-      publishedAt: '2026-10-28'
+/** What this theme reads from the store: the app's to provide, and only samples until it does. */
+export const DEMO_DATA = defineData({
+  siteTagline: dataField.value({
+    label: { en: 'Tagline', it: 'Slogan' },
+    type: 'string',
+    sample: 'Digital Product & Architecture Journal'
+  }),
+  articles: dataField.list({
+    label: { en: 'Articles', it: 'Articoli' },
+    help: { en: "The site's articles, newest first.", it: 'Gli articoli del sito, dal più recente.' },
+    item: {
+      id: 'string',
+      title: 'string',
+      excerpt: 'string',
+      category: 'string',
+      readingTimeMinutes: 'number',
+      featured: 'boolean',
+      publishedAt: 'string'
     },
-    {
-      id: 'a2',
-      title: 'Designing Recursive Block Trees for Non-Technical Editors',
-      excerpt: 'Bridging developer-authored TSX blocks with Gutenberg-style starter patterns in a single settings.json schema.',
-      category: 'design',
-      readingTimeMinutes: 5,
-      featured: true,
-      publishedAt: '2026-10-21'
-    },
-    {
-      id: 'a3',
-      title: 'Zero-Trust CSS & DOM Sanitization Across Worker Boundaries',
-      excerpt: 'Keeping third-party theme styles and host component callbacks fast, deterministic, and isolated.',
-      category: 'engineering',
-      readingTimeMinutes: 9,
-      featured: false,
-      publishedAt: '2026-10-14'
-    },
-    {
-      id: 'a4',
-      title: 'Multi-Brand Product Strategy Without Per-Customer Forks',
-      excerpt: 'Scaling enterprise deployments when every client demands bespoke layouts and localized copy.',
-      category: 'strategy',
-      readingTimeMinutes: 6,
-      featured: false,
-      publishedAt: '2026-10-02'
-    }
-  ],
-  services: [
-    {
-      id: 's1',
-      title: 'Design System & Block Library Engineering',
-      summary: 'Reusable TSX blocks with typed field schemas and nested drop zones for visual editors.',
-      tier: 'core',
-      badge: 'Core'
-    },
-    {
-      id: 's2',
-      title: 'Sandboxed Multi-Tenant Frontend Architecture',
-      summary: 'Worker-isolated rendering pipelines with automatic slot and page error recovery.',
-      tier: 'enterprise',
-      badge: 'Enterprise'
-    },
-    {
-      id: 's3',
-      title: 'Interactive Editorial & Content Workflows',
-      summary: 'High-velocity publishing experiences powered by fine-grained reactive stores.',
-      tier: 'core',
-      badge: 'Core'
-    }
-  ],
-  settings: {}
+    sample: [
+      {
+        id: 'a1',
+        title: 'Why Sandboxed Class Inheritance Beats Static Templates',
+        excerpt: 'How object-oriented slots and path-tracked selectors let customers customize workflows without forking your app.',
+        category: 'engineering',
+        readingTimeMinutes: 7,
+        featured: true,
+        publishedAt: '2026-10-28'
+      },
+      {
+        id: 'a2',
+        title: 'Designing Recursive Block Trees for Non-Technical Editors',
+        excerpt: 'Bridging developer-authored TSX blocks with Gutenberg-style starter patterns in a single settings.json schema.',
+        category: 'design',
+        readingTimeMinutes: 5,
+        featured: true,
+        publishedAt: '2026-10-21'
+      },
+      {
+        id: 'a3',
+        title: 'Zero-Trust CSS & DOM Sanitization Across Worker Boundaries',
+        excerpt: 'Keeping third-party theme styles and host component callbacks fast, deterministic, and isolated.',
+        category: 'engineering',
+        readingTimeMinutes: 9,
+        featured: false,
+        publishedAt: '2026-10-14'
+      },
+      {
+        id: 'a4',
+        title: 'Multi-Brand Product Strategy Without Per-Customer Forks',
+        excerpt: 'Scaling enterprise deployments when every client demands bespoke layouts and localized copy.',
+        category: 'strategy',
+        readingTimeMinutes: 6,
+        featured: false,
+        publishedAt: '2026-10-02'
+      }
+    ]
+  }),
+  services: dataField.list({
+    label: { en: 'Services', it: 'Servizi' },
+    item: { id: 'string', title: 'string', summary: 'string', tier: 'string', badge: 'string' },
+    sample: [
+      {
+        id: 's1',
+        title: 'Design System & Block Library Engineering',
+        summary: 'Reusable TSX blocks with typed field schemas and nested drop zones for visual editors.',
+        tier: 'core',
+        badge: 'Core'
+      },
+      {
+        id: 's2',
+        title: 'Sandboxed Multi-Tenant Frontend Architecture',
+        summary: 'Worker-isolated rendering pipelines with automatic slot and page error recovery.',
+        tier: 'enterprise',
+        badge: 'Enterprise'
+      },
+      {
+        id: 's3',
+        title: 'Interactive Editorial & Content Workflows',
+        summary: 'High-velocity publishing experiences powered by fine-grained reactive stores.',
+        tier: 'core',
+        badge: 'Core'
+      }
+    ]
+  })
+});
+
+/** What the playground itself knows; the rest of the store is the theme's data, above. */
+export const INITIAL_STORE_STATE = {
+  language: 'en' as const,
+  currentPage: 'home'
 };
+
+export const DEMO_SETTINGS_JSON = settingsJson(demoSettings, {
+  blocks: DEMO_BLOCKS,
+  patterns: DEMO_PATTERNS,
+  data: DEMO_DATA
+});

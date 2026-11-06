@@ -168,25 +168,76 @@ export function reorderBlockInSlot(
   return next;
 }
 
-/** Appends `nodesToInsert` into the slot at `slotPath` (`[]` for root, or `[index, slotName, ...]`). */
+/** Inserts `nodesToInsert` into the slot at `slotPath` (`[]` for root, or `[index, slotName, ...]`), at `index` or at its end. */
 export function insertBlocksAtSlotPath(
   tree: readonly BlockNode[],
   slotPath: BlockPath,
-  nodesToInsert: readonly BlockNode[]
+  nodesToInsert: readonly BlockNode[],
+  index?: number
 ): readonly BlockNode[] {
   if (!slotPath.length) {
-    return [...tree, ...nodesToInsert];
+    const at = index === undefined ? tree.length : Math.max(0, Math.min(index, tree.length));
+    return [...tree.slice(0, at), ...nodesToInsert, ...tree.slice(at)];
   }
   const [head, slotName, ...tail] = slotPath;
   if (typeof head !== 'number' || typeof slotName !== 'string' || head < 0 || head >= tree.length) return tree;
   const current = tree[head]!;
-  const existing = current.slots?.[slotName] ?? [];
-  const nextChildren = tail.length ? insertBlocksAtSlotPath(existing, tail, nodesToInsert) : [...existing, ...nodesToInsert];
   const next = [...tree];
   next[head] = {
     ...current,
-    slots: { ...(current.slots ?? {}), [slotName]: nextChildren }
+    slots: { ...(current.slots ?? {}), [slotName]: insertBlocksAtSlotPath(current.slots?.[slotName] ?? [], tail, nodesToInsert, index) }
   };
   return next;
 }
 
+/** Whether `path` is `container` or anything inside it. */
+export function isWithin(path: BlockPath, container: BlockPath): boolean {
+  return path.length >= container.length && container.every((part, index) => part === path[index]);
+}
+
+/** Where `path` is once the block at `removed` is gone; null if it went with it. */
+export function pathAfterRemoval(path: BlockPath, removed: BlockPath): BlockPath | null {
+  if (!removed.length) return path;
+  if (isWithin(path, removed)) return null;
+  const parent = removed.slice(0, -1);
+  const at = path[parent.length];
+  if (!isWithin(path, parent) || typeof at !== 'number' || at <= (removed.at(-1) as number)) return path;
+  return [...path.slice(0, parent.length), at - 1, ...path.slice(parent.length + 1)];
+}
+
+function pathAfterInsertion(path: BlockPath, slot: BlockPath, index: number): BlockPath {
+  const at = path[slot.length];
+  if (!isWithin(path, slot) || typeof at !== 'number' || at < index) return path;
+  return [...path.slice(0, slot.length), at + 1, ...path.slice(slot.length + 1)];
+}
+
+/**
+ * Moves the block at `from` to the gap `gap` of the slot at `toSlot`: gap 0 is before its first block, and `gap`
+ * counts the blocks as they are before the move. Null when there's nothing to do: the block is already there, it
+ * would go inside itself, or it doesn't exist. `path` is where it ends up.
+ */
+export function moveBlock(
+  tree: readonly BlockNode[],
+  from: BlockPath,
+  toSlot: BlockPath,
+  gap: number
+): { readonly tree: readonly BlockNode[]; readonly path: BlockPath } | null {
+  const node = getBlockAtPath(tree, from);
+  if (!node || isWithin(toSlot, from)) return null;
+  const fromIndex = from.at(-1) as number;
+  const sameSlot = pathsEqual(from.slice(0, -1), toSlot) || (from.length === 1 && toSlot.length === 0);
+  if (sameSlot && (gap === fromIndex || gap === fromIndex + 1)) return null;
+  const slot = pathAfterRemoval(toSlot, from)!;
+  const index = sameSlot && gap > fromIndex ? gap - 1 : gap;
+  return { tree: insertBlocksAtSlotPath(removeBlockAtPath(tree, from), slot, [node], index), path: [...slot, index] };
+}
+
+/** Where `path` is once the block at `from` has moved to `gap` of `toSlot` (see `moveBlock`), keeping a selection on its block. */
+export function pathAfterMove(path: BlockPath, from: BlockPath, toSlot: BlockPath, gap: number): BlockPath {
+  const fromIndex = from.at(-1) as number;
+  const sameSlot = pathsEqual(from.slice(0, -1), toSlot) || (from.length === 1 && toSlot.length === 0);
+  const slot = pathAfterRemoval(toSlot, from) ?? toSlot;
+  const index = sameSlot && gap > fromIndex ? gap - 1 : gap;
+  if (isWithin(path, from)) return [...slot, index, ...path.slice(from.length)];
+  return pathAfterInsertion(pathAfterRemoval(path, from) ?? path, slot, index);
+}

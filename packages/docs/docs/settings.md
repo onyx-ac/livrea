@@ -91,3 +91,32 @@ The admin reads `settings.json` from the theme's package:
 ```
 
 It builds its form from `fields`, checks values with the same rules (`fits` and `resolveSettings` in `livrea` do it in TypeScript), and stores them. A value a later version of the theme no longer accepts does no harm: it reads as that version's default.
+
+## Declaring the Data a Theme Reads
+
+Settings say how a list looks; what's in it comes from the app, through the store. Declare what your theme reads next to its settings, and an app or builder can tell what it needs:
+
+```ts
+import { dataField, defineData, type DataValues } from 'livrea';
+
+export const data = defineData({
+  articles: dataField.list({
+    label: { en: 'Articles' },
+    item: { id: 'string', title: 'string', minutes: 'number?' },
+    sample: [{ id: 'a1', title: 'Hello', minutes: 3 }]
+  }),
+  tagline: dataField.value({ label: { en: 'Tagline' }, type: 'string', sample: 'A journal' })
+});
+
+declare module 'livrea' {
+  interface ThemeStore extends DataValues<typeof data> {}
+}
+```
+
+`dataField` has `list`, `record` (one item) and `value`, with the types `string`, `number` and `boolean`, `any` for nested data (only checked for being there), and `?` for values that may be left out. A sample that doesn't fit its shape fails as the theme is defined. Export `data` from the settings module, and `livrea pack` writes it to `settings.json`, or pass it to `settingsJson(settings, { data })`.
+
+Declaring fetches nothing: the app provides the data in its store, as always.
+
+- **`checkThemeData(data, state)`** reports each entry as `provided`, `missing` or `invalid`, for an app's upload step.
+- **`withSampleData(data, state)`** fills what's missing with the samples, for a builder's preview. The engine never does this by itself, so a running app can't show a sample as if it were real.
+

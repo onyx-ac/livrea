@@ -311,6 +311,10 @@ App engineers can mount the full 3-pane `<ThemeBuilder />` or compose its indivi
 | `<PatternPicker />` | Visual gallery of `patterns` from `settings.json` filtered by target slot, unpacking the chosen `BlockNode[]` tree on selection. |
 | `<SettingsForm />` | Renders the 7 scalar `field.*` controls (`color`, `text`, `localizedText`, `select`, `toggle`, `range`, `image`) for either top-level theme settings or the currently selected Block's `props`. |
 
+### Visual Editing on the Preview
+
+`<ThemeBuilder />` also edits on the preview itself: click a block to select it, drag it within its slot or into another, add blocks to empty slots, and remove them. It shares its selection with the outline and the Inspector, so both ways can be mixed. It needs a runtime started with `editing: true`, and `EDITOR_HOST_NAMES` in its policy: see the [`@livrea/ui` README](https://github.com/onyx-ac/livrea/tree/main/packages/ui#visual-editing). Only an editing runtime emits the markers this relies on; everywhere else, blocks render as they always have.
+
 ### Low-Footprint Design Principles
 
 1. **Zero UI library dependencies:** Built with semantic HTML, accessible ARIA attributes, and native pointer events—only `livrea` and `react` are peer dependencies.

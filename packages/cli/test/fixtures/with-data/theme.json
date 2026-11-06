@@ -1,0 +1,9 @@
+{
+  "id": "with-data",
+  "name": "Sample",
+  "version": "1.2.0",
+  "engine": "test-app@1",
+  "parent": "base",
+  "description": "A theme for the CLI's tests.",
+  "shared": ["@app/pages"]
+}

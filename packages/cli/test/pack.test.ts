@@ -40,6 +40,13 @@ describe('livrea pack', () => {
     });
   });
 
+  it('writes what the theme reads from the store, with its samples', async () => {
+    const files = unzipSync(readFileSync((await pack(fixture('with-data'), { outDir: out() })).file));
+    expect(JSON.parse(text(files['settings.json']!)).data).toEqual({
+      rooms: { kind: 'list', label: { en: 'Rooms' }, item: { id: 'string', beds: 'number?' }, sample: [{ id: 'r1', beds: 2 }] }
+    });
+  });
+
   it('leaves Livrea and the app’s shared modules out, for importTheme to provide', async () => {
     const files = unzipSync(readFileSync((await pack(fixture('sample'), { outDir: out() })).file));
     const module = text(files['build/theme.js']!);

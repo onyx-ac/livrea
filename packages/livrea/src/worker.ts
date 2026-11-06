@@ -62,6 +62,8 @@ export interface ServeOptions {
   readonly block?: Blocked;
   /** Functions next to the state, such as `s.items(type)`. */
   readonly helpers?: RuntimeOptions['helpers'];
+  /** A builder is editing the theme's blocks: they render with markers for its visual editing. */
+  readonly editing?: boolean;
 }
 
 const GLOBALS: Readonly<Record<keyof Blocked, readonly string[]>> = {
@@ -126,6 +128,7 @@ export function serveRuntime(options: ServeOptions, scope: WorkerScope = globalT
               state: message.state,
               page: message.page,
               helpers: options.helpers,
+              editing: options.editing,
               post: (out) => scope.postMessage(out)
             });
             for (const next of waiting.splice(0)) runtime.receive(next);

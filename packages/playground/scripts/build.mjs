@@ -49,7 +49,7 @@ writeFileSync(join(distDir, 'index.html'), HTML);
 if (process.argv.includes('--serve')) {
   const ctx = await context(options);
   await ctx.watch();
-  const { port } = await ctx.serve({ servedir: distDir, port: 3001 });
+  const { port } = await ctx.serve({ servedir: distDir, port: 3007 });
   console.log(`Livrea interactive demo running at http://localhost:${port}`);
 } else {
   await build(options);

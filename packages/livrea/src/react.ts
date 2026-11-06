@@ -30,7 +30,7 @@ export type { ThemeSource } from './runtime.js';
 // --- Connecting a theme to the app ---
 
 /** The theme runs in the app's own thread. */
-export function connectInThread({ theme, events }: RuntimeSetup): Connect {
+export function connectInThread({ theme, events, editing }: RuntimeSetup): Connect {
   return (deliver, { state, page }) => {
     const runtime = createRuntime({
       pages: theme.pages,
@@ -40,6 +40,7 @@ export function connectInThread({ theme, events }: RuntimeSetup): Connect {
       events,
       state,
       page,
+      editing,
       post: deliver
     });
     return { send: (message) => runtime.receive(message), close: () => runtime.dispose() };

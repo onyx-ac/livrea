@@ -8,6 +8,8 @@ export default defineConfig({
     alias: [{ find: /^@livrea\/ui$/, replacement: uiEntry }]
   },
   test: {
+    // One test renders the whole playground in jsdom: seconds even on a quiet machine.
+    testTimeout: 30000,
     environment: 'jsdom',
     include: ['test/**/*.test.{ts,tsx}']
   }

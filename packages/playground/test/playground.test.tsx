@@ -5,7 +5,8 @@ import { strFromU8, strToU8, unzipSync } from 'fflate';
 import { describe, expect, it } from 'vitest';
 import { DemoApp } from '../src/app.js';
 import { buildThemeZipBytes } from '../src/download.js';
-import { DEMO_SETTINGS_JSON } from '../src/theme.js';
+import { checkThemeData, withSampleData, type SettingsJson } from 'livrea';
+import { DEMO_DATA, DEMO_SETTINGS_JSON } from '../src/theme.js';
 import { parseUploadedTheme } from '../src/upload.js';
 
 (globalThis as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true;
@@ -41,6 +42,10 @@ describe('@livrea/playground', () => {
     expect(container.textContent).toContain('Why Sandboxed Class Inheritance Beats Static Templates');
     expect(container.textContent).toContain('Upload theme');
     expect(container.textContent).toContain('Download theme');
+    // The preview is edited in place: its blocks carry their addresses, under the editor's layer.
+    await act(async () => new Promise((resolve) => setTimeout(resolve, 0)));
+    expect(container.querySelector('.livrea-ui-editor')).not.toBeNull();
+    expect(container.querySelector('[data-livrea-block]')?.getAttribute('data-livrea-block')).toBe(JSON.stringify(['homeStage', [0]]));
 
     // Clicking "Articles" in the rendered theme header navigates to the Articles page and syncs the Page command palette selector.
     const navButtons = Array.from(container.querySelectorAll('.meridian-nav button'));
@@ -89,6 +94,10 @@ describe('@livrea/playground', () => {
       'tsconfig.json'
     ]);
 
+    // What the theme reads from the store travels with it.
+    expect((JSON.parse(strFromU8(files['settings.json']!)) as SettingsJson).data?.articles?.kind).toBe('list');
+    expect(strFromU8(files['src/settings.ts']!)).toContain('export const data = defineData(');
+
     const preset = JSON.parse(strFromU8(files['preset-settings.json']!)) as Record<string, unknown>;
     expect(preset.accent).toBe('#10b981');
     expect(preset.siteName).toBe('Apex Engineering');
@@ -100,6 +109,13 @@ describe('@livrea/playground', () => {
     expect(uploaded.version).toBe('2.1.0');
     expect(uploaded.values.accent).toBe('#10b981');
     expect(uploaded.schema.fields.accent?.default).toBe('#10b981');
+  });
+
+  it('declares the data it shows, and keeps it when only the settings are replaced', async () => {
+    expect(checkThemeData(DEMO_DATA, {}).every((check) => check.status === 'missing')).toBe(true);
+    expect(checkThemeData(DEMO_DATA, withSampleData(DEMO_DATA, {})).every((check) => check.status === 'provided')).toBe(true);
+    const parsed = await parseUploadedTheme('s.json', strToU8(JSON.stringify({ format: 1, fields: {} })), DEMO_SETTINGS_JSON);
+    expect(parsed.schema.data).toBe(DEMO_DATA);
   });
 
   it('allows uploading a standalone settings.json schema to redefine customizability', async () => {

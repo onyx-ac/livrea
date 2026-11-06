@@ -56,6 +56,8 @@ export interface RuntimeOptions {
   page?: PageShown | null;
   /** The theme's settings (defineSettings), read from the store's `settings`. */
   settings?: SettingsSchema;
+  /** A builder is editing the theme's blocks: they render with markers for its visual editing. Off everywhere else. */
+  editing?: boolean;
   /** Reusable visual blocks (defineBlock) used by `field.blocks()` settings. */
   blocks?: Readonly<Record<string, BlockDefinition<any, any>>> | readonly BlockDefinition<any, any>[];
 }
@@ -175,6 +177,7 @@ export function createRuntime(options: RuntimeOptions): Runtime {
     store: store.view as ThemeStore,
     settings,
     blocks,
+    editing: options.editing === true,
     setState(component, patch) {
       const instance = instances.get(component);
       if (!instance) return;
