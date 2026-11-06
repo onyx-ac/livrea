@@ -1,6 +1,6 @@
 # Livrea
 
-**Bespoke customer UIs and workflows for React, kiosk, and screen apps—without forking your codebase.**
+**Class-based theming engine and visual builder to customize and extend React applications.**
 
 *Livrea* is Italian for *livery*: the colours and marks a company puts on its whole fleet. Livrea does that for software: it dresses the same application in each customer's look, and lets each one reshape its layout and behaviour, while your core product stays a single codebase.
 

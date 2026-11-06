@@ -1,6 +1,6 @@
 # Livrea
 
-**Bespoke customer UIs and workflows for React, kiosk, and screen apps—without forking your codebase.**
+**Class-based theming engine and visual builder to customize and extend React applications.**
 
 *Livrea* is Italian for *livery*: the colours and marks a company puts on its whole fleet. Livrea does that for software: it dresses the same application in each customer's look, and lets each one reshape its layout and behaviour, while your core product stays a single codebase.
 
@@ -8,7 +8,7 @@
 
 ## Why Livrea?
 
-Every B2B, kiosk, hospitality, or fleet application eventually hits the customisation wall:
+Every scalable B2B, SaaS, or fleet application eventually hits the customisation wall:
 - **CSS variables and config flags aren't enough** when a customer wants to reorder a screen, combine two steps, or route a category button to a custom calendar view.
 - **Static templates (Liquid, Mustache, JSON schemas) trap behaviour in the app**—they can arrange markup, but every new interaction requires a new hook from your core team, and customising a page means copying the whole template and losing upstream updates.
 - **Forking per customer doesn't scale**—every new feature or security fix becomes an $N$-way merge across customer branches.

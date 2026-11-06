@@ -1,7 +1,7 @@
 {
   "name": "livrea-workspace",
   "private": true,
-  "description": "Livrea's workspace: the engine (livrea), its command-line tool (@livrea/cli), its visual builder (@livrea/ui), its interactive playground (@livrea/playground) and its documentation site.",
+  "description": "Class-based theming engine and visual builder to customize and extend React applications.",
   "license": "CC-BY-SA-4.0",
   "workspaces": [
     "packages/livrea",
