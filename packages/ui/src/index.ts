@@ -1,4 +1,5 @@
 export { BlockTree, type BlockTreeProps } from './block-tree.js';
+export { DataSection } from './data-section.js';
 export { PatternPicker, type PatternPickerProps } from './pattern-picker.js';
 export { SettingsForm, type SettingsFormProps } from './settings-form.js';
 export { BUILDER_STYLES } from './styles.js';

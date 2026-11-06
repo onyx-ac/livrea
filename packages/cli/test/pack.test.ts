@@ -47,6 +47,13 @@ describe('livrea pack', () => {
     });
   });
 
+  it('takes data from src/data.ts, leaving the samples out of the theme’s code', async () => {
+    const files = unzipSync(readFileSync((await pack(fixture('with-samples'), { outDir: out() })).file));
+    expect(JSON.parse(text(files['settings.json']!)).data.rooms.sample[0].name).toBe('Only in samples');
+    expect(text(files['build/theme.js']!)).not.toContain('Only in samples');
+    expect(Object.keys(files)).toContain('source/src/samples.json');
+  });
+
   it('leaves Livrea and the app’s shared modules out, for importTheme to provide', async () => {
     const files = unzipSync(readFileSync((await pack(fixture('sample'), { outDir: out() })).file));
     const module = text(files['build/theme.js']!);

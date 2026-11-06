@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Button, CommandPalette, createStaticSource, IconButton, Kbd } from '@astryxdesign/core';
 import { Resizable } from 're-resizable';
-import { checkThemeData, type BlockNode, type BlocksField, type DataSchema, type SettingsJson } from 'livrea';
+import type { BlockNode, BlocksField, DataSchema, SettingsJson } from 'livrea';
 import type { ThemeClient } from 'livrea/host';
 import type { HostComponents } from 'livrea/react';
 import { BlockTree } from './block-tree.js';
+import { DataSection } from './data-section.js';
 import { SettingsForm, type SettingsFormProps } from './settings-form.js';
 import { BUILDER_STYLES } from './styles.js';
 import { ThemeCanvas, type ThemeCanvasEventTrigger } from './theme-canvas.js';
@@ -18,6 +19,8 @@ export interface ThemeBuilderProps {
   readonly values: Readonly<Record<string, unknown>>;
   /** The data the app really provides, as in its store: what the Data section reports the theme's declarations against. */
   readonly data?: Readonly<Record<string, unknown>>;
+  /** Called when samples are edited in the Data section, with the theme's data as it now is; without it, they can't be. */
+  readonly onDataChange?: (nextData: DataSchema) => void;
   /** Called whenever scalar settings or slot block trees change. */
   readonly onChange: (nextValues: Record<string, unknown>) => void;
   /** Optional live `ThemeClient` to render the interactive center canvas. */
@@ -43,6 +46,7 @@ export interface ThemeBuilderProps {
 /** A moment to go back to: the values, and what was on screen, so undoing shows what it changed. */
 interface HistoryEntry {
   readonly values: Readonly<Record<string, unknown>>;
+  readonly data: DataSchema | undefined;
   readonly slotKey: string;
   readonly path: BlockPath | null;
   readonly page: string;
@@ -62,6 +66,7 @@ export function ThemeBuilder({
   schema,
   values,
   data,
+  onDataChange,
   onChange,
   client,
   components,
@@ -93,8 +98,14 @@ export function ThemeBuilder({
   const [, setHistorySize] = useState(0);
   const historyChanged = () => setHistorySize((n) => n + 1);
 
-  if (emitted.current !== values) {
+  // Likewise the samples this builder last gave the app. Any others are a new theme's: Reset goes back to those.
+  const emittedData = useRef(schema.data);
+  const originalData = useRef(schema.data);
+
+  if (emitted.current !== values || emittedData.current !== schema.data) {
+    if (emittedData.current !== schema.data) originalData.current = schema.data;
     emitted.current = values;
+    emittedData.current = schema.data;
     past.current = [];
     future.current = [];
     lastStep.current = null;
@@ -199,7 +210,7 @@ export function ThemeBuilder({
   const selectedBlock = selectedPath ? getBlockAtPath(currentTree, selectedPath) : undefined;
   const selectedBlockSchema = selectedBlock ? schema.blocks?.[selectedBlock.block] : undefined;
 
-  const here = (): HistoryEntry => ({ values, slotKey: activeSlotKey, path: selectedPath, page: activePageId });
+  const here = (): HistoryEntry => ({ values, data: schema.data, slotKey: activeSlotKey, path: selectedPath, page: activePageId });
 
   /** Every change goes through here. `stepKey` names a field whose quick changes count as one step. */
   const commit = (next: Record<string, unknown>, stepKey?: string) => {
@@ -213,9 +224,22 @@ export function ThemeBuilder({
     historyChanged();
   };
 
+  const commitData = (next: DataSchema) => {
+    past.current = [...past.current, here()].slice(-HISTORY_LIMIT);
+    future.current = [];
+    lastStep.current = null;
+    emittedData.current = next;
+    onDataChange?.(next);
+    historyChanged();
+  };
+
   const restore = (entry: HistoryEntry) => {
     lastStep.current = null;
     emitted.current = entry.values as Record<string, unknown>;
+    if (entry.data !== schema.data && entry.data) {
+      emittedData.current = entry.data;
+      onDataChange?.(entry.data);
+    }
     setActiveSlotKey(entry.slotKey);
     setSelectedPath(entry.path);
     onChange(entry.values as Record<string, unknown>);
@@ -501,54 +525,17 @@ export function ThemeBuilder({
                 languages={languages}
                 onPickImage={onPickImage}
               />
-              <DataSection schema={schema.data} provided={data ?? {}} locale={locale} />
+              <DataSection
+                schema={schema.data}
+                original={originalData.current}
+                provided={data ?? {}}
+                locale={locale}
+                onChange={onDataChange ? commitData : undefined}
+              />
             </section>
           )}
         </div>
       </Resizable>
-    </div>
-  );
-}
-
-/** What the theme reads from the store, and whether the preview is showing the app's or the theme's samples. */
-function DataSection({
-  schema,
-  provided,
-  locale
-}: {
-  readonly schema: DataSchema | undefined;
-  readonly provided: Readonly<Record<string, unknown>>;
-  readonly locale: string;
-}) {
-  const checks = checkThemeData(schema, provided);
-  if (!schema || !checks.length) return null;
-  const STATUS = { provided: 'From the app', missing: 'Sample data', invalid: 'Wrong shape' } as const;
-  return (
-    <div role="group" aria-label="Data" style={{ marginTop: 16 }}>
-      <h3 className="livrea-ui-section-title">Data</h3>
-      <p className="livrea-ui-help" style={{ marginBottom: 8 }}>
-        What this theme reads from the app. Samples only show in this preview: the app has to provide the real data.
-      </p>
-      <ul className="livrea-ui-data-list">
-        {checks.map(({ name, status, problem }) => {
-          const definition = schema[name]!;
-          const count = definition.kind === 'list' && Array.isArray(status === 'provided' ? provided[name] : definition.sample)
-            ? ((status === 'provided' ? provided[name] : definition.sample) as readonly unknown[]).length
-            : null;
-          return (
-            <li key={name} className="livrea-ui-data-item" data-status={status}>
-              <div className="livrea-ui-data-row">
-                <span title={name}>{localize(definition.label, locale, name)}</span>
-                <span className="livrea-ui-data-status">
-                  {STATUS[status]}
-                  {count !== null && status !== 'invalid' ? ` · ${count}` : ''}
-                </span>
-              </div>
-              {problem ? <p className="livrea-ui-help">{problem}</p> : definition.help ? <p className="livrea-ui-help">{localize(definition.help, locale)}</p> : null}
-            </li>
-          );
-        })}
-      </ul>
     </div>
   );
 }

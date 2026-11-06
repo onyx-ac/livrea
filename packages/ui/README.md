@@ -46,11 +46,13 @@ Keyboard, with the canvas focused: `Delete` removes the selected block, `Alt+↑
 
 ## Data
 
-A theme can declare what it reads from the store, with `defineData` beside its settings; `livrea pack` writes it to `settings.json`. The builder's Inspector then lists it, each item as **Sample data**, **From the app**, or **Wrong shape** with what's wrong. Pass what your app really has as `<ThemeBuilder data={...} />`, and start the preview with samples for the rest:
+A theme can declare what it reads from the store, with `defineData` beside its settings; `livrea pack` writes it to `settings.json`. The builder's Inspector then lists it, each item as **Sample data**, **From the app**, or **Wrong shape** with what's wrong. Pass what your app really has as `<ThemeBuilder data={...} />`, and start the preview with samples for the rest. With `onDataChange`, samples can be edited there to see the theme with an empty list, a long one or the wrong shape, and undo covers it:
 
 ```tsx
 state: withSampleData(schema.data, { ...yourState, settings: values });
 ```
+
+Declare data in `src/data.ts`, with its samples in `src/samples.json`, importing them by that name. Only the packer reads that module, so samples go into `settings.json` and not into the code an app loads.
 
 Samples are for previews. In a running app the engine never adds them; use `checkThemeData(schema.data, state)` to tell someone a theme needs data the app doesn't provide.
 

@@ -1,0 +1,14 @@
+{
+  "compilerOptions": {
+    "resolveJsonModule": true,
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "strict": true,
+    "jsx": "react-jsx",
+    "jsxImportSource": "livrea",
+    "skipLibCheck": true,
+    "noEmit": true
+  },
+  "include": ["src", "../app-pages.d.ts"]
+}

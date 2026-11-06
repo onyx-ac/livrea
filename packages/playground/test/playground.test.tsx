@@ -88,7 +88,9 @@ describe('@livrea/playground', () => {
       'package.json',
       'preset-settings.json',
       'settings.json',
+      'src/data.ts',
       'src/index.tsx',
+      'src/samples.json',
       'src/settings.ts',
       'theme.json',
       'tsconfig.json'
@@ -96,7 +98,8 @@ describe('@livrea/playground', () => {
 
     // What the theme reads from the store travels with it.
     expect((JSON.parse(strFromU8(files['settings.json']!)) as SettingsJson).data?.articles?.kind).toBe('list');
-    expect(strFromU8(files['src/settings.ts']!)).toContain('export const data = defineData(');
+    expect(strFromU8(files['src/data.ts']!)).toContain('samples["articles"]');
+    expect((JSON.parse(strFromU8(files['src/samples.json']!)) as { articles: unknown[] }).articles).toHaveLength(4);
 
     const preset = JSON.parse(strFromU8(files['preset-settings.json']!)) as Record<string, unknown>;
     expect(preset.accent).toBe('#10b981');

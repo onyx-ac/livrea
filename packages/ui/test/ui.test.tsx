@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { act, useState, type ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
-import { dataField, defineData, definePattern, defineSettings, field, settingsJson, type BlockNode, type BlockSchema } from 'livrea';
+import { dataField, defineData, definePattern, defineSettings, field, settingsJson, type BlockNode, type BlockSchema, type SettingsJson } from 'livrea';
 import { describe, expect, it, vi } from 'vitest';
 import {
   BlockTree,
@@ -603,6 +603,99 @@ describe('the Data section', () => {
     const view = mount(<ThemeBuilder schema={SCHEMA} values={{}} onChange={() => {}} />);
     expect(section(view.container)).toBeNull();
     view.unmount();
+  });
+});
+
+describe('editing samples', () => {
+  const data = defineData({
+    articles: dataField.list({ label: { en: 'Articles' }, item: { id: 'string', title: 'string' }, sample: [{ id: 'a', title: 'First' }, { id: 'b', title: 'Second' }] }),
+    tagline: dataField.value({ label: { en: 'Tagline' }, type: 'string', sample: 'Hello' })
+  });
+  let schema: SettingsJson;
+
+  function Stateful({ provided }: { provided?: Record<string, unknown> }) {
+    const [current, setCurrent] = useState<SettingsJson>({ ...SCHEMA, data });
+    const [values, setValues] = useState<Record<string, unknown>>({});
+    schema = current;
+    return <ThemeBuilder schema={current} values={values} onChange={setValues} onDataChange={(next) => setCurrent((c) => ({ ...c, data: next }))} data={provided} />;
+  }
+
+  const button = (root: ParentNode, label: string) => Array.from(root.querySelectorAll('button')).find((b) => b.getAttribute('aria-label') === label || b.textContent === label);
+  const click = (root: ParentNode, label: string) => act(() => button(root, label)!.click());
+  const row = (root: ParentNode, n: number) => root.querySelectorAll('[aria-label="Data"] li')[n]!;
+  const type = (root: ParentNode, value: string) => {
+    const area = root.querySelector<HTMLTextAreaElement>('[aria-label="Data"] textarea')!;
+    act(() => {
+      Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')!.set!.call(area, value);
+      area.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+  };
+
+  it('empties a list and takes it back, by Reset or by undo', () => {
+    const view = mount(<Stateful />);
+    const before = schema.data!.articles!.sample;
+    click(view.container, 'Empty articles');
+    expect(schema.data!.articles!.sample).toEqual([]);
+    expect(row(view.container, 0).textContent).toContain('Sample data · 0 · edited');
+    click(view.container, 'Reset articles');
+    expect(schema.data!.articles!.sample).toBe(before);
+    expect(row(view.container, 0).textContent).not.toContain('edited');
+    click(view.container, 'Empty articles');
+    act(() => void window.dispatchEvent(new KeyboardEvent('keydown', { key: 'z', ctrlKey: true, bubbles: true })));
+    expect(schema.data!.articles!.sample).toBe(before);
+    view.unmount();
+  });
+
+  it('makes a list long, with ids that stay different', () => {
+    const view = mount(<Stateful />);
+    click(view.container, 'Long articles');
+    const items = schema.data!.articles!.sample as readonly { id: string }[];
+    expect(items).toHaveLength(24);
+    expect(new Set(items.map((item) => item.id)).size).toBe(24);
+    expect(button(view.container, 'Long articles')!.disabled).toBe(true);
+    view.unmount();
+  });
+
+  it('applies JSON that fits', () => {
+    const view = mount(<Stateful />);
+    click(view.container, 'Edit tagline');
+    type(view.container, '"Goodbye"');
+    expect(view.container.querySelector('[role="alert"]')).toBeNull();
+    click(view.container, 'Apply');
+    expect(schema.data!.tagline!.sample).toBe('Goodbye');
+    view.unmount();
+  });
+
+  it("won't apply what isn't JSON", () => {
+    const view = mount(<Stateful />);
+    click(view.container, 'Edit tagline');
+    type(view.container, '{ nope');
+    expect(view.container.querySelector('[role="alert"]')!.textContent).toContain("isn't valid JSON");
+    expect(button(view.container, 'Apply')!.disabled).toBe(true);
+    click(view.container, 'Cancel');
+    expect(schema.data!.tagline!.sample).toBe('Hello');
+    view.unmount();
+  });
+
+  it('says what is wrong with a shape, and applies it only if asked, showing it as wrong', () => {
+    const view = mount(<Stateful />);
+    click(view.container, 'Edit articles');
+    type(view.container, '[{ "id": "a", "title": 3 }]');
+    expect(view.container.querySelector('[role="alert"]')!.textContent).toContain('articles[0].title should be a string');
+    click(view.container, 'Apply anyway');
+    expect(row(view.container, 0).getAttribute('data-status')).toBe('invalid');
+    expect(row(view.container, 0).textContent).toContain('Wrong shape');
+    view.unmount();
+  });
+
+  it('offers nothing to edit for what the app provides, or without onDataChange', () => {
+    const view = mount(<Stateful provided={{ tagline: 'Real' }} />);
+    expect(button(view.container, 'Edit tagline')).toBeUndefined();
+    expect(button(view.container, 'Edit articles')).toBeDefined();
+    view.unmount();
+    const plain = mount(<ThemeBuilder schema={{ ...SCHEMA, data }} values={{}} onChange={() => {}} />);
+    expect(button(plain.container, 'Edit articles')).toBeUndefined();
+    plain.unmount();
   });
 });
 

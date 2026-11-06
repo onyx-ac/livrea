@@ -113,7 +113,9 @@ declare module 'livrea' {
 }
 ```
 
-`dataField` has `list`, `record` (one item) and `value`, with the types `string`, `number` and `boolean`, `any` for nested data (only checked for being there), and `?` for values that may be left out. A sample that doesn't fit its shape fails as the theme is defined. Export `data` from the settings module, and `livrea pack` writes it to `settings.json`, or pass it to `settingsJson(settings, { data })`.
+`dataField` has `list`, `record` (one item) and `value`, with the types `string`, `number` and `boolean`, `any` for nested data (only checked for being there), and `?` for values that may be left out. A sample that doesn't fit its shape fails as the theme is defined. Put this in `src/data.ts`, with the samples in one `src/samples.json` (`import samples from './samples.json'`, and `resolveJsonModule` in `tsconfig.json`), and `livrea pack` writes them to `settings.json`, leaving them out of the code an app loads. `data` in `theme.json` names another module; `settingsJson(settings, { data })` does the same by hand.
+
+In a builder, samples can be edited to see the theme with an empty list, a long one or the wrong shape; **Download theme** in the playground writes them back to `src/samples.json`.
 
 Declaring fetches nothing: the app provides the data in its store, as always.
 

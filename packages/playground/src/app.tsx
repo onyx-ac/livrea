@@ -337,6 +337,7 @@ export function DemoApp() {
           schema={schema}
           values={values}
           onChange={setValues}
+          onDataChange={(data) => setSchema((current) => ({ ...current, data }))}
           client={client}
           components={PREVIEW_COMPONENTS}
           pages={pageNames}

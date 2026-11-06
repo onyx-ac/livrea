@@ -37,6 +37,11 @@ export interface ThemeJson {
   entry?: string;
   /** The module that exports its settings (defineSettings) as `settings`; src/settings.ts if there is one. */
   settings?: string;
+  /**
+   * The module that exports what the theme reads from the store (defineData) as `data`; src/data.ts if there is one.
+   * Apart from the settings, so that a theme importing its settings doesn't carry its samples: only the packer reads this.
+   */
+  data?: string;
   /** Modules the app provides at runtime, such as its base pages: imported, never bundled. */
   shared?: string[];
 }
@@ -70,6 +75,7 @@ export async function pack(folder: string, options: PackOptions = {}): Promise<P
   const entry = theme.entry ?? ['src/index.ts', 'src/index.tsx'].find((file) => existsSync(join(dir, file)));
   if (!entry || !existsSync(join(dir, entry))) throw new PackError(`No entry module: add src/index.ts, or name one as "entry" in theme.json.`);
   const settingsFile = theme.settings ?? ['src/settings.ts', 'src/settings.tsx'].find((file) => existsSync(join(dir, file)));
+  const dataFile = theme.data ?? ['src/data.ts', 'src/data.tsx'].find((file) => existsSync(join(dir, file)));
   const tsconfig = existsSync(join(dir, 'tsconfig.json')) ? join(dir, 'tsconfig.json') : undefined;
 
   if (options.check !== false && tsconfig) typeCheck(tsconfig);
@@ -79,7 +85,7 @@ export async function pack(folder: string, options: PackOptions = {}): Promise<P
     'theme.json': readFileSync(join(dir, 'theme.json')),
     'build/theme.js': module
   };
-  if (settingsFile) files['settings.json'] = Buffer.from(JSON.stringify(await readSettings(dir, settingsFile, tsconfig), null, 2) + '\n');
+  if (settingsFile || dataFile) files['settings.json'] = Buffer.from(JSON.stringify(await readSettings(dir, settingsFile, dataFile, tsconfig), null, 2) + '\n');
   for (const path of sourceFiles(dir)) files[`source/${path}`] = readFileSync(join(dir, path));
 
   const manifest = { files: Object.fromEntries(Object.entries(files).map(([path, data]) => [path, sha256(data)])) };
@@ -159,8 +165,36 @@ async function bundle(dir: string, entry: string, tsconfig: string | undefined, 
   return result.outputFiles[0]!.contents;
 }
 
-/** The settings' definitions: only the settings module runs, never the theme. */
-async function readSettings(dir: string, file: string, tsconfig: string | undefined): Promise<unknown> {
+/** The settings' definitions, and the data it reads: only those modules run, never the theme. */
+async function readSettings(dir: string, file: string | undefined, dataFile: string | undefined, tsconfig: string | undefined): Promise<unknown> {
+  const loaded = file ? await loadModule(dir, file, tsconfig) : { settings: {} };
+  if (!loaded.settings || typeof loaded.settings !== 'object') {
+    throw new PackError(`${file} needs to export its settings: export const settings = defineSettings({ … }).`);
+  }
+  // A settings module exporting `data` too still counts, but brings its samples into the theme's module.
+  const data = dataFile ? (await loadModule(dir, dataFile, tsconfig)).data : loaded.data;
+  if (dataFile && (!data || typeof data !== 'object')) {
+    throw new PackError(`${dataFile} needs to export its data: export const data = defineData({ … }).`);
+  }
+  const blocks = extractBlocks(loaded.blocks);
+  const patterns = extractPatterns(loaded.patterns);
+  return JSON.parse(
+    JSON.stringify({
+      format: 1,
+      fields: loaded.settings,
+      ...(blocks ? { blocks } : {}),
+      ...(patterns ? { patterns } : {}),
+      ...(data && typeof data === 'object' && Object.keys(data).length ? { data } : {})
+    })
+  ) as unknown;
+}
+
+/** Runs one of the theme's modules on its own, for what it exports. */
+async function loadModule(
+  dir: string,
+  file: string,
+  tsconfig: string | undefined
+): Promise<{ settings?: unknown; blocks?: unknown; patterns?: unknown; data?: unknown }> {
   const result = await build({
     absWorkingDir: dir,
     entryPoints: [file],
@@ -179,26 +213,7 @@ async function readSettings(dir: string, file: string, tsconfig: string | undefi
   try {
     const path = join(temporary, 'settings.mjs');
     writeFileSync(path, result.outputFiles[0]!.contents);
-    const loaded = (await import(pathToFileURL(path).href)) as {
-      settings?: unknown;
-      blocks?: unknown;
-      patterns?: unknown;
-      data?: unknown;
-    };
-    if (!loaded.settings || typeof loaded.settings !== 'object') {
-      throw new PackError(`${file} needs to export its settings: export const settings = defineSettings({ … }).`);
-    }
-    const blocks = extractBlocks(loaded.blocks);
-    const patterns = extractPatterns(loaded.patterns);
-    return JSON.parse(
-      JSON.stringify({
-        format: 1,
-        fields: loaded.settings,
-        ...(blocks ? { blocks } : {}),
-        ...(patterns ? { patterns } : {}),
-        ...(loaded.data && typeof loaded.data === 'object' && Object.keys(loaded.data).length ? { data: loaded.data } : {})
-      })
-    ) as unknown;
+    return (await import(pathToFileURL(path).href)) as { settings?: unknown; blocks?: unknown; patterns?: unknown; data?: unknown };
   } finally {
     rmSync(temporary, { recursive: true, force: true });
   }

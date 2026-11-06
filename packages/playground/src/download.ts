@@ -85,6 +85,7 @@ export function buildThemeZipBytes(
       strict: true,
       jsx: 'react-jsx',
       jsxImportSource: 'livrea',
+      resolveJsonModule: true,
       noEmit: true
     },
     include: ['src']
@@ -112,9 +113,7 @@ export function buildThemeZipBytes(
     }
   });
 
-  const settingsTs = `import { defineData, definePattern, defineSettings, field } from 'livrea';
-
-export const data = defineData(${JSON.stringify(schema.data ?? {}, null, 2)});
+  const settingsTs = `import { definePattern, defineSettings, field } from 'livrea';
 
 export const blocks = ${JSON.stringify(schema.blocks ?? {}, null, 2)} as const;
 
@@ -237,6 +236,7 @@ npm run pack       # produces ${themeJson.id}-${themeJson.version}.livrea
 
 - \`settings.json\`: The theme's customizability schema (\`fields\`, \`blocks\`, \`patterns\`) — can also be uploaded directly back into the Livrea Playground.
 - \`src/settings.ts\`: Contains your customized \`field.*\` defaults, \`blocks\` schemas, and \`patterns\`.
+- \`src/data.ts\` and \`src/samples.json\`: What the theme reads from the store, with the samples for previews, as you left them in the builder.
 - \`src/index.tsx\`: Contains the theme's \`Layout\`, page classes (\`HomePage\`, \`ArticlesPage\`, \`ContactPage\`), and reusable blocks.
 - \`preset-settings.json\`: Raw \`store.settings\` JSON values from your visual builder session.
 `;
@@ -249,6 +249,7 @@ npm run pack       # produces ${themeJson.id}-${themeJson.version}.livrea
       'package.json': strToU8(JSON.stringify(packageJson, null, 2) + '\n'),
       'tsconfig.json': strToU8(JSON.stringify(tsconfigJson, null, 2) + '\n'),
       'src/settings.ts': strToU8(settingsTs),
+      ...dataFiles(schema.data),
       'src/index.tsx': strToU8(indexTsx),
       'README.md': strToU8(readmeMd)
     },
@@ -272,4 +273,25 @@ export function triggerThemeZipDownload(
   link.click();
   link.remove();
   URL.revokeObjectURL(url);
+}
+
+/** What the theme reads from the store: the declarations in src/data.ts, and their samples in the one src/samples.json. */
+function dataFiles(data: SettingsJson['data']): Record<string, Uint8Array> {
+  if (!data || !Object.keys(data).length) return {};
+  const samples = Object.fromEntries(Object.entries(data).map(([name, definition]) => [name, definition.sample]));
+  const declarations = Object.entries(data).map(([name, { sample: _sample, ...definition }]) => {
+    const body = JSON.stringify(definition, null, 2).replace(/\n\}$/, `,\n  "sample": samples[${JSON.stringify(name)}]\n}`);
+    return `  ${JSON.stringify(name)}: ${body.replace(/\n/g, '\n  ')}`;
+  });
+  const dataTs = `import { defineData, type DataSchema } from 'livrea';
+import samples from './samples.json';
+
+export const data = defineData({
+${declarations.join(',\n')}
+} as unknown as DataSchema);
+`;
+  return {
+    'src/data.ts': strToU8(dataTs),
+    'src/samples.json': strToU8(JSON.stringify(samples, null, 2) + '\n')
+  };
 }

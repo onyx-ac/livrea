@@ -229,6 +229,25 @@ export const BUILDER_STYLES = `
   color: var(--livrea-ui-danger);
 }
 
+.livrea-ui-data-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 6px;
+}
+.livrea-ui-data-editor {
+  margin-top: 6px;
+}
+.livrea-ui-data-editor textarea {
+  font-family: ui-monospace, monospace;
+  font-size: 11px;
+  min-height: 160px;
+}
+.livrea-ui-data-editor [data-problem] {
+  color: var(--livrea-ui-danger);
+  margin-top: 4px;
+}
+
 .livrea-ui-canvas-content {
   position: relative;
   min-height: 100%;
