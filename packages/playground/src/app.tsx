@@ -162,9 +162,9 @@ function createDefaultValues(): Record<string, unknown> {
       it: 'Rivista di ingegneria, studio di prodotto e sistemi web modulari.'
     },
     showReadingCount: true,
-    homeStage: cloneBlockTree(EditorialSplitPattern.tree, DEMO_SETTINGS_JSON.blocks),
-    articlesStage: cloneBlockTree(MagazineIndexPattern.tree, DEMO_SETTINGS_JSON.blocks),
-    contactStage: cloneBlockTree(SplitContactPattern.tree, DEMO_SETTINGS_JSON.blocks)
+    homeMain: cloneBlockTree(EditorialSplitPattern.tree, DEMO_SETTINGS_JSON.blocks),
+    articlesMain: cloneBlockTree(MagazineIndexPattern.tree, DEMO_SETTINGS_JSON.blocks),
+    contactMain: cloneBlockTree(SplitContactPattern.tree, DEMO_SETTINGS_JSON.blocks)
   };
 }
 

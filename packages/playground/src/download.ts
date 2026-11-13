@@ -181,34 +181,34 @@ export class SiteLayout extends Layout {
 
 export class HomePage extends Component {
   Hero = slot(() => <h1>{String((this.settings as Record<string, any>).heroTitle?.en ?? 'Welcome')}</h1>);
-  Stage = blockSlot('homeStage');
+  Main = blockSlot('homeMain');
   override render() {
     return (
       <section>
         <this.Hero />
-        <this.Stage />
+        <this.Main />
       </section>
     );
   }
 }
 
 export class ArticlesPage extends Component {
-  Stage = blockSlot('articlesStage');
+  Main = blockSlot('articlesMain');
   override render() {
     return (
       <section>
-        <this.Stage />
+        <this.Main />
       </section>
     );
   }
 }
 
 export class ContactPage extends Component {
-  Stage = blockSlot('contactStage');
+  Main = blockSlot('contactMain');
   override render() {
     return (
       <section>
-        <this.Stage />
+        <this.Main />
       </section>
     );
   }

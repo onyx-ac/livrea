@@ -361,7 +361,7 @@ export const DEMO_BLOCKS = [
 export const EditorialSplitPattern = definePattern({
   id: 'editorial-split',
   label: { en: 'Services Sidebar + Latest Articles Card', it: 'Servizi + Scheda Ultimi Articoli' },
-  for: 'homeStage',
+  for: 'homeMain',
   tree: [
     {
       block: 'split-columns',
@@ -402,7 +402,7 @@ export const EditorialSplitPattern = definePattern({
 export const AgencyLandingPattern = definePattern({
   id: 'agency-landing',
   label: { en: 'Full Services Grid + Inline Contact Form', it: 'Griglia Servizi + Modulo Contatto' },
-  for: 'homeStage',
+  for: 'homeMain',
   tree: [
     { block: 'callout-banner', props: { target: 'articles', highlight: true } },
     {
@@ -423,7 +423,7 @@ export const AgencyLandingPattern = definePattern({
 export const MagazineIndexPattern = definePattern({
   id: 'magazine-index',
   label: { en: 'Featured Spotlight + Engineering Feed', it: 'In Evidenza + Feed Ingegneria' },
-  for: 'articlesStage',
+  for: 'articlesMain',
   tree: [
     {
       block: 'split-columns',
@@ -455,7 +455,7 @@ export const MagazineIndexPattern = definePattern({
 export const SplitContactPattern = definePattern({
   id: 'split-contact',
   label: { en: 'Advisory Services + Contact Inquiry Form', it: 'Servizi di Consulenza + Modulo Contatto' },
-  for: 'contactStage',
+  for: 'contactMain',
   tree: [
     {
       block: 'split-columns',
@@ -522,18 +522,18 @@ export const demoSettings = defineSettings({
     label: { en: 'Show Article Count in Header', it: 'Mostra conteggio articoli nella testata' },
     default: true
   }),
-  homeStage: field.blocks({
-    label: { en: 'Home Page — Main Stage', it: 'Pagina Home — Area Principale' },
+  homeMain: field.blocks({
+    label: { en: 'Home Page — Main Content', it: 'Pagina Home — Contenuto Principale' },
     allowed: ['split-columns', 'section-card', 'article-feed', 'services-grid', 'contact-block', 'callout-banner'],
     default: EditorialSplitPattern.tree
   }),
-  articlesStage: field.blocks({
-    label: { en: 'Articles Page — Stage', it: 'Pagina Articoli — Area Principale' },
+  articlesMain: field.blocks({
+    label: { en: 'Articles Page — Main Content', it: 'Pagina Articoli — Contenuto Principale' },
     allowed: ['split-columns', 'section-card', 'article-feed', 'callout-banner'],
     default: MagazineIndexPattern.tree
   }),
-  contactStage: field.blocks({
-    label: { en: 'Contact Page — Stage', it: 'Pagina Contatti — Area Principale' },
+  contactMain: field.blocks({
+    label: { en: 'Contact Page — Main Content', it: 'Pagina Contatti — Contenuto Principale' },
     allowed: ['split-columns', 'section-card', 'services-grid', 'contact-block', 'callout-banner'],
     default: SplitContactPattern.tree
   })
@@ -761,13 +761,13 @@ export class HomePage extends Component {
     return <h1 className="meridian-hero-title">{heroTitle[this.data.lang] || heroTitle.en}</h1>;
   });
 
-  Stage = blockSlot('homeStage');
+  Main = blockSlot('homeMain');
 
   override render() {
     return (
       <section>
         <this.Hero />
-        <this.Stage />
+        <this.Main />
       </section>
     );
   }
@@ -785,7 +785,7 @@ export class ArticlesPage extends Component {
     })
   };
 
-  Stage = blockSlot('articlesStage');
+  Main = blockSlot('articlesMain');
 
   override render() {
     return (
@@ -796,20 +796,20 @@ export class ArticlesPage extends Component {
           </h1>
           <span className="meridian-meta">Topics: {this.data.categories.join(' · ')}</span>
         </div>
-        <this.Stage />
+        <this.Main />
       </section>
     );
   }
 }
 
 export class ContactPage extends Component {
-  Stage = blockSlot('contactStage');
+  Main = blockSlot('contactMain');
 
   override render() {
     return (
       <section>
         <h1 className="meridian-hero-title">Work With Us</h1>
-        <this.Stage />
+        <this.Main />
       </section>
     );
   }

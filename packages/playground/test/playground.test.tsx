@@ -45,7 +45,7 @@ describe('@livrea/playground', () => {
     // The preview is edited in place: its blocks carry their addresses, under the editor's layer.
     await act(async () => new Promise((resolve) => setTimeout(resolve, 0)));
     expect(container.querySelector('.livrea-ui-editor')).not.toBeNull();
-    expect(container.querySelector('[data-livrea-block]')?.getAttribute('data-livrea-block')).toBe(JSON.stringify(['homeStage', [0]]));
+    expect(container.querySelector('[data-livrea-block]')?.getAttribute('data-livrea-block')).toBe(JSON.stringify(['homeMain', [0]]));
 
     // Clicking "Articles" in the rendered theme header navigates to the Articles page and syncs the Page command palette selector.
     const navButtons = Array.from(container.querySelectorAll('.meridian-nav button'));
@@ -76,7 +76,7 @@ describe('@livrea/playground', () => {
       {
         accent: '#10b981',
         siteName: 'Apex Engineering',
-        homeStage: [{ block: 'article-feed', props: { category: 'engineering', featuredOnly: true, limit: 2, showReadingTime: true } }]
+        homeMain: [{ block: 'article-feed', props: { category: 'engineering', featuredOnly: true, limit: 2, showReadingTime: true } }]
       },
       DEMO_SETTINGS_JSON,
       { id: 'apex-web', name: 'Apex Engineering', version: '2.1.0' }

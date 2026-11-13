@@ -24,7 +24,7 @@ export interface ThemeJson {
   name: string;
   /** x.y.z; a package's version never changes once installed. */
   version: string;
-  /** The app API it's written for, e.g. "hotel-kiosk@1": the app decides which it runs. */
+  /** The app API it's written for, e.g. "hotel-app@1": the app decides which it runs. */
   engine: string;
   /** The theme it extends, for the admin to show; the code says what it extends. */
   parent?: string;
@@ -106,7 +106,7 @@ function readThemeJson(dir: string): ThemeJson {
   if (typeof theme.id !== 'string' || !ID.test(theme.id)) throw new PackError('theme.json needs an id of lowercase letters, digits and dashes, e.g. "linen".');
   if (typeof theme.name !== 'string' || !theme.name.trim()) throw new PackError('theme.json needs a name.');
   if (typeof theme.version !== 'string' || !VERSION.test(theme.version)) throw new PackError('theme.json needs a version like 1.0.0.');
-  if (typeof theme.engine !== 'string' || !theme.engine) throw new PackError('theme.json needs the engine it is written for, e.g. "hotel-kiosk@1".');
+  if (typeof theme.engine !== 'string' || !theme.engine) throw new PackError('theme.json needs the engine it is written for, e.g. "hotel-app@1".');
   if (theme.shared !== undefined && (!Array.isArray(theme.shared) || !theme.shared.every((name) => typeof name === 'string'))) {
     throw new PackError('theme.json\'s "shared" lists module names.');
   }

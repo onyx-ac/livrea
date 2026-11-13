@@ -5,7 +5,7 @@ Interactive browser playground for [`livrea`](../livrea) and [`@livrea/ui`](../u
 It runs a complete website sample theme (**Meridian Studio** — editorial articles, featured services, and contact form) inside `<ThemeBuilder />`, letting you:
 - Exercise reactive **list processing** with `ArticleFeed` (filtering articles by category, featured status, reading time, and item limit) and `ServicesGrid` (filtering by service tier and column layout).
 - Interact with host components like `ContactForm` (`contact-block`) and `ActionButton` across multiple pages (`home`, `articles`, `contact`).
-- Rearrange **Blocks** inside **Slots** (`homeStage`, `articlesStage`, `contactStage`) and nested container slots (`Left`, `Right`, `Header`, `Body`, `Footer`).
+- Rearrange **Blocks** inside **Slots** (`homeMain`, `articlesMain`, `contactMain`) and nested container slots (`Left`, `Right`, `Header`, `Body`, `Footer`).
 - Unpack starter **Patterns** (`EditorialSplitPattern`, `AgencyLandingPattern`, `MagazineIndexPattern`, `SplitContactPattern`) and customize their nested blocks at any depth.
 - **Edit on the preview**: click, drag between slots, add to empty slots and remove blocks directly on the canvas, or switch it to **Preview** to use the page. Undo and redo cover all of it.
 - See **what data the theme reads** in the Inspector's Data section. Articles and services are its samples (`DEMO_DATA` in `src/theme.tsx`), passed through `withSampleData`: nothing is fetched. Edit them there, try an empty or long list, and **Download theme** saves them to `src/samples.json`.

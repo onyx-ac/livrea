@@ -116,6 +116,7 @@ export function ThemeBuilder({
       return pages.map((pageName) => {
         const matchingSlot = blockFields.find(
           ([key]) =>
+            key === `${pageName}Main` ||
             key === `${pageName}Stage` ||
             key === pageName ||
             key.toLowerCase().includes(pageName.toLowerCase())
@@ -134,7 +135,7 @@ export function ThemeBuilder({
       });
     }
     return blockFields.map(([key, fieldDef]) => {
-      const pageName = key.replace(/Stage$/, '');
+      const pageName = key.replace(/(Main|Stage)$/, '');
       return {
         id: pageName,
         label: localize(fieldDef.label, locale, key),
@@ -180,7 +181,11 @@ export function ThemeBuilder({
       return;
     }
     const matchingSlot = blockFields.find(
-      ([key]) => key === `${activePage}Stage` || key === activePage || key.toLowerCase().includes(activePage.toLowerCase())
+      ([key]) =>
+        key === `${activePage}Main` ||
+        key === `${activePage}Stage` ||
+        key === activePage ||
+        key.toLowerCase().includes(activePage.toLowerCase())
     );
     if (matchingSlot) {
       setActiveSlotKey(matchingSlot[0]);

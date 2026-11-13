@@ -31,10 +31,10 @@ linen/
   "id": "linen",
   "name": "Linen",
   "version": "1.0.0",
-  "engine": "hotel-kiosk@1",
+  "engine": "hotel-app@1",
   "parent": "lacquer",
   "description": { "EN": "Light and airy.", "IT": "Leggero e arioso." },
-  "shared": ["@hotel/kiosk-theme"]
+  "shared": ["@hotel/theme-kit"]
 }
 ```
 
@@ -76,7 +76,7 @@ import { importTheme, serveRuntime } from 'livrea/worker';
 import * as kit from './theme-kit';
 
 serveRuntime({
-  theme: () => importTheme(themeModuleUrl, { '@hotel/kiosk-theme': kit }),
+  theme: () => importTheme(themeModuleUrl, { '@hotel/theme-kit': kit }),
   block: { storage: true }
 });
 ```

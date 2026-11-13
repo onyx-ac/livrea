@@ -35,7 +35,7 @@ Infinite customisation depth comes from making **Slots** and **Blocks** recursiv
 ```text
 Page Class (HomePage)
 ├── Slot: Header
-└── Slot: Stage
+└── Slot: Main
     └── Block: SplitColumns (ratio = "1:2")
         ├── Slot: Left
         │   └── Block: HostAvatar (size = "large")
@@ -49,7 +49,7 @@ Page Class (HomePage)
 
 | Concept | Gutenberg Counterpart | Role in Livrea |
 |---|---|---|
-| **Slot** | Block Area / InnerBlocks | A named drop zone. Pages have root slots (`Header`, `Stage`, `Rail`), and container Blocks expose inner slots (`Left`, `Right`, `Body`, `Footer`). |
+| **Slot** | Block Area / InnerBlocks | A named drop zone. Pages have root slots (`Header`, `Main`, `Rail`), and container Blocks expose inner slots (`Left`, `Right`, `Body`, `Footer`). |
 | **Block** | Block | A reusable Livrea component with a [`field.*`](./settings.md) schema for the visual Inspector and optional inner `slots`. |
 | **Pattern** | Block Pattern | A pre-assembled tree of nested Blocks and preset `field` values. Dropping a Pattern into a Slot unpacks its blocks so every child can be inspected, reordered, or edited at any depth. |
 
@@ -106,13 +106,13 @@ Because a Block runs inside the Livrea runtime:
 
 ## 2. Slots: Recursive Drop Zones
 
-Every Slot on a Page (`<this.Stage />`) or inside a Block (`<slots.Body />`) is an isolated reactive unit (`OutUnit`) with a default rendering.
+Every Slot on a Page (`<this.Main />`) or inside a Block (`<slots.Body />`) is an isolated reactive unit (`OutUnit`) with a default rendering.
 
 When a designer customises a Slot visually, the builder stores a serialisable `BlockNode[]` tree for that slot:
 
 ```json
 {
-  "Stage": [
+  "Main": [
     {
       "block": "split-columns",
       "props": { "ratio": "1:2" },
@@ -148,14 +148,14 @@ A **Pattern** is not a rigid black-box component; it is a named preset containin
 export const WelcomeSplitPattern = definePattern({
   id: 'welcome-split',
   label: { en: 'Welcome Split with Daily Menu' },
-  targetSlot: 'Stage',
+  for: 'homeMain',
   tree: [
     // The nested BlockNode[] tree above
   ]
 });
 ```
 
-1. **One-click insertion:** In the visual builder, a non-technical user clicks the `Stage` slot and picks *"Welcome Split with Daily Menu"* from the Pattern gallery.
+1. **One-click insertion:** In the visual builder, a non-technical user clicks the `Main` slot and picks *"Welcome Split with Daily Menu"* from the Pattern gallery.
 2. **Deep customisation:** The pattern unpacks into `SplitColumns` → `Card` → `DailyMenu` + `ActionButton`. The user can then click the inner `Card` to change `tone` from `"gold"` to `"glass"`, drag a `WeatherBadge` block into `Card`'s `Header` slot, or delete `ActionButton`.
 
 ---
@@ -176,9 +176,9 @@ export const settings = defineSettings({
   accent: field.color({ label: { en: 'Accent colour' }, default: '#c9a96e' }),
   corners: field.range({ label: { en: 'Corner radius' }, min: 0, max: 32, step: 2, unit: 'px', default: 16 }),
 
-  // A visual block tree for the Home page's Stage slot
-  homeStage: field.blocks({
-    label: { en: 'Home — Stage' },
+  // A visual block tree for the Home page's Main slot
+  homeMain: field.blocks({
+    label: { en: 'Home — Main Content' },
     allowed: ['split-columns', 'card', 'daily-menu', 'host-avatar', 'action-button'],
     default: [
       { block: 'host-avatar', props: { size: 'large' } }
@@ -196,9 +196,9 @@ When `livrea pack` evaluates `src/settings.ts`, `settings.json` remains the **si
   "format": 1,
   "fields": {
     "accent": { "kind": "color", "label": { "en": "Accent colour" }, "default": "#c9a96e" },
-    "homeStage": {
+    "homeMain": {
       "kind": "blocks",
-      "label": { "en": "Home — Stage" },
+      "label": { "en": "Home — Main Content" },
       "allowed": ["split-columns", "card", "daily-menu", "host-avatar", "action-button"],
       "default": [{ "block": "host-avatar", "props": { "size": "large" } }]
     }
@@ -224,7 +224,7 @@ When `livrea pack` evaluates `src/settings.ts`, `settings.json` remains the **si
   "patterns": {
     "welcome-split": {
       "label": { "en": "Welcome Split with Daily Menu" },
-      "for": "homeStage",
+      "for": "homeMain",
       "tree": [
         {
           "block": "split-columns",
@@ -247,7 +247,7 @@ When `livrea pack` evaluates `src/settings.ts`, `settings.json` remains the **si
 ### 3. Why This Keeps the Server, Admin, and Runtime Simple
 
 1. **Zero Server or Protocol Changes:**
-   The app server already stores a single JSON object of setting values per preset and sends it to the client in `store.settings`. Whether a key in `store.settings` is `"accent": "#123456"` or `"homeStage": [{ "block": "card", ... }]`, it lives in the same JSON blob, travels over the same `state` / `patches` messages, and is tracked by path in the `Store`.
+   The app server already stores a single JSON object of setting values per preset and sends it to the client in `store.settings`. Whether a key in `store.settings` is `"accent": "#123456"` or `"homeMain": [{ "block": "card", ... }]`, it lives in the same JSON blob, travels over the same `state` / `patches` messages, and is tracked by path in the `Store`.
 2. **Recursive Validation with `resolveSetting()`:**
    - For scalar fields, `resolveSetting()` checks `fits(definition, value)` and falls back to `definition.default`.
    - For a `blocks` field, `resolveSetting()` recursively walks the `BlockNode[]` tree:
@@ -311,9 +311,35 @@ App engineers can mount the full 3-pane `<ThemeBuilder />` or compose its indivi
 | `<PatternPicker />` | Visual gallery of `patterns` from `settings.json` filtered by target slot, unpacking the chosen `BlockNode[]` tree on selection. |
 | `<SettingsForm />` | Renders the 7 scalar `field.*` controls (`color`, `text`, `localizedText`, `select`, `toggle`, `range`, `image`) for either top-level theme settings or the currently selected Block's `props`. |
 
-### Visual Editing on the Preview
+### The Canvas Stage vs Page Main Slot
 
-`<ThemeBuilder />` also edits on the preview itself: click a block to select it, drag it within its slot or into another, add blocks to empty slots, and remove them. It shares its selection with the outline and the Inspector, so both ways can be mixed. It needs a runtime started with `editing: true`, and `EDITOR_HOST_NAMES` in its policy: see the [`@livrea/ui` README](https://github.com/onyx-ac/livrea/tree/main/packages/ui#visual-editing). Only an editing runtime emits the markers this relies on; everywhere else, blocks render as they always have.
+To avoid confusion between editor chrome and document structure, Livrea distinguishes between:
+
+1. **The Canvas Stage (`.livrea-ui-canvas-stage`)**:
+   In `@livrea/ui`, the center preview workspace inside `<ThemeCanvas />` is the **Canvas Stage**. This is the interactive workbench that hosts the simulated device viewport, providing:
+   - **Multi-bound resizing** with drag handles (`re-resizable`) and preset viewports (responsive, mobile, tablet, desktop).
+   - **Independent panel scrolling**, keeping side panels and the canvas scrollable on their own.
+   - **Visual editing overlay**: Drag-and-drop handles, hover outlines, selection rings, and empty slot drop markers.
+2. **Page Main Slots (`homeMain`, `articlesMain`, `<this.Main />`)**:
+   Inside a theme, page classes follow the HTML-aligned convention of naming their primary block drop-zone slot **`Main`** (`<this.Main />`), backed by a setting such as `homeMain: field.blocks(...)`. `<ThemeBuilder />` automatically links active page navigation with `${pageName}Main` (or exact page matches) so switching pages in the Command Palette instantly focuses the matching block tree.
+
+### Visual Editing on the Preview & Full Undo/Redo
+
+`<ThemeBuilder />` edits on the preview itself: click a block to select it, drag it within its slot or into another, add blocks to empty slots (`+`), and remove them. It shares its selection bidirectionally with the `<BlockTree />` outline and the `<SettingsForm />` Inspector.
+
+- **Non-destructive markers**: It runs with `editing: true` in `ThemeClient` and `EDITOR_HOST_NAMES` in its policy. Only an editing runtime emits the zero-box `display: contents` markers; everywhere else, blocks render normally.
+- **Comprehensive Undo/Redo**: Every block insertion, move, deletion, prop tweak, and sample data edit is recorded in an undo/redo history (`Ctrl+Z`, `Ctrl+Shift+Z` / `Cmd+Z`, or toolbar buttons), automatically restoring the active page and selected block across transitions.
+
+### Live Data Inspector & Editable Samples
+
+Themes can declare what store paths they read via `defineData({ ... })`. When inspecting in `<ThemeBuilder />`:
+- The Inspector's **Data** tab checks each declared item against the app's real store state, labeling it as **From the app**, **Sample data**, or **Wrong shape** (with precise type mismatch diagnostics).
+- Designers can edit sample values directly in the Inspector to stress-test empty states or long lists, covered by the undo history.
+- The **Download theme** action exports these updated samples into `src/samples.json` inside the `.zip` archive.
+
+### Astryx UI Integration & Planned Component Ejection
+
+The current builder controls, dialogs, and command palette leverage `@astryxdesign/core`. Once the overall user experience is validated, an ejection of the required Astryx primitives directly into `@livrea/ui` and `@livrea/playground` is planned, preserving the design system while eliminating external library dependencies.
 
 ### Low-Footprint Design Principles
 
